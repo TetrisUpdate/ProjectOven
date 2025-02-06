@@ -87,7 +87,6 @@ endmac
 ?WriteData:
 	setb LCD_RS
 	ljmp LCD_byte
-	
 
 ;---------------------------------;
 ; Write command to LCD            ;
@@ -201,41 +200,5 @@ Display_char mac
 	lcall ?WriteData
 	pop acc
 endmac
-
-Send_BCD mac
-push ar0
-mov r0, %0
-lcall ?Send_BCD
-pop ar0
-endmac
-?Send_BCD:
-push acc
-; Write most significant digit
-mov a, r0
-swap a
-anl a, #0fh
-orl a, #30h
-lcall putchar
-; write least significant digit
-mov a, r0
-anl a, #0fh
-orl a, #30h
-lcall putchar
-pop acc
-ret
-
-Send_char mac
-	push acc
-	mov a, %0
-	lcall putchar
-	pop acc
-endmac
-
-putchar:
-    jnb TI, putchar
-    clr TI
-    mov SBUF, a
-    ret
-
 
 	
