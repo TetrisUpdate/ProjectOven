@@ -89,4 +89,3 @@
 
 - **Commit Often:** Break down your changes into small, logical commits with descriptive messages.
 - **Pull Before You Push:** Always pull the latest changes before pushing to avoid conflicts.
-- **Communicate:** Use pull request descriptions to explain the "what" and "why" behind your changes.
