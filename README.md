@@ -39,12 +39,13 @@
 
 #### **Pull (Fetch + Merge)**
 
-1. Click the bottom-left corner of VS Code (the branch indicator).
-2. Select `Pull` from the dropdown.
+1. Press F1 to open the Command Pallete
+2. Type `Git: Pull` and select it
    - This fetches changes from the remote repo and merges them into your current branch.
    - If someone else pushes changes, this updates your copy to the latest one 
 3. Resolve any merge conflicts if they appear.
     - This happens if you make **local** changes to a line that someone else just updated by pushing, then you try pulling
+    - It's fine if the lines changed are different, the changes automatically get merged and don't override your local changes
 
 #### **Sync**
 
