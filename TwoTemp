@@ -1,5 +1,5 @@
 ; 76E003 ADC test program: Reads channel 7 on P1.1, pin 14
-
+;Test
 $NOLIST
 $MODN76E003
 $LIST
