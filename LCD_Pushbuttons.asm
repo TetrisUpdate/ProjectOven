@@ -110,12 +110,13 @@ LCD_PB:
 	clr P0.2
 	clr P0.3
 	clr P1.3
-	jb P1.5, LCD_PB_Done
+	jb P1.5, LCD_PB_Done ;If all buttons are not pressed, this will cause P1.5 to be set to high
+	; Otherwise, if a button is pressed, P1.5 will be set to low, so execute all code below
 
 	; Debounce
 	mov R2, #50
 	lcall waitms
-	jb P1.5, LCD_PB_Done
+	jb P1.5, LCD_PB_Done ;If the button is no longer pressed, skip
 
 	; Set the LCD data pins to logic 1
 	setb P0.0
