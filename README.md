@@ -7,7 +7,7 @@
 1. Open Visual Studio Code (VS Code).
 2. Open the Command Palette (Press F1).
 3. Select/Type `Git: Clone`.
-4. Paste the repository URL: `https://github.com/your-team/reflow-oven-controller.git`. (You might be able to just select it)
+4. Paste the repository URL: `https://github.com/TetrisUpdate/ProjectOven`. (You might be able to just select it)
 5. Choose a local folder where the repo will be cloned.
 6. Once cloned, open the project folder in VS Code. (This should happen automatically)
 
