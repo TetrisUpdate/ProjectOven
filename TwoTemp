@@ -228,10 +228,10 @@ Forever:
 	mov a, ADCRH   
     swap a
     push acc
-    anl a, #0x0f
+    anl a, #0x0f ; 12-bit ADC, moves high 6 bits to R1
     mov R1, a
     pop acc
-    anl a, #0xf0
+    anl a, #0xf0 ;Moves low 6 bits to R0
     orl a, ADCRL
     mov R0, A
     
