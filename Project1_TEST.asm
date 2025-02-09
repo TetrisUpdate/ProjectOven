@@ -25,8 +25,8 @@ BAUD              EQU 115200 ; Baud rate of UART in bps
 TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
 
-SAMPLES_PER_DISPLAY equ 50 
-REFRESHES_PER_SECOND equ 5 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
+SAMPLES_PER_DISPLAY equ 255 
+REFRESHES_PER_SECOND equ 16 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
 TIMER0_DENOM equ (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
 
 ORG 0x0000
@@ -230,7 +230,7 @@ Forever:
 	mov VAL_LM4040+0, R0
 	mov VAL_LM4040+1, R1
 
-	; Read the signal connected to AIN7
+	; Read the signal connected to AIN7 (for testing, this reads analog signal of opamp)
 	anl ADCCON0, #0xF0
 	orl ADCCON0, #0x07 ; Select channel 7
 	lcall Read_ADC
@@ -290,11 +290,14 @@ Forever:
 	mov MeasurementCounter+1, a	
 	lcall div32
 
-	Load_y(100)
+	Load_y(1000)
 	lcall mul32
 
-	load_y(2730000)
-	lcall sub32
+	;load_y(2730000)
+	;lcall sub32
+	
+	;Load_y(220000)
+	;lcall add32
 
 	mov y+0, LastMeasurement+0
 	mov y+1, LastMeasurement+1
@@ -309,6 +312,8 @@ Forever:
 	lcall add32
 	Load_y(2)
 	lcall div32
+
+	
 
 	; Convert to BCD and display
 	lcall hex2bcd
