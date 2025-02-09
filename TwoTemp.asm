@@ -51,6 +51,8 @@ y:   ds 4
 store: ds 4
 bcd: ds 5
 
+ThermocoupleTemp: ds 2
+
 BSEG
 mf: dbit 1
 
@@ -215,8 +217,8 @@ Forever:
 	Load_y(4095) ; 2^12-1
 	lcall div32
 	
-	Load_y(2200)
-	lcall add32
+	;Load_y(2200)
+	;lcall add32
 	;Load_y(27300) ; loads 27300 into y
 	;lcall sub32
 	
@@ -247,8 +249,8 @@ Forever:
 	lcall mul32
 	Load_y(4095) ; 2^12-1
 	lcall div32
-	Load_y(27300) ; loads 27300 into y
-	lcall sub32
+
+	
 	
 	;mov y+0, store+0
 	;mov y+1, store+1
