@@ -184,13 +184,19 @@ main:
 	ljmp Forever
 
 SendBCD:
+
 	mov a, bcd+2
+	anl a, #0x0F ; Isolate ones place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+1
 	anl a, #0xF0 ; Isolate tens place
 	swap a ; Put high nibble into lower nibble
 	add a, #'0' ; Convert value to ASCII
 	lcall SendSerial
 
-	mov a, bcd+2
+	mov a, bcd+1
 	anl a, #0x0F ; Isolate ones place
 	add a, #'0' ; Convert value to ASCII
 	lcall SendSerial
@@ -198,13 +204,13 @@ SendBCD:
 	mov a, #'.'
 	lcall SendSerial
 
-	mov a, bcd+1
+	mov a, bcd+0
 	anl a, #0xF0 ; Isolate 0.1 place
 	swap a ; Put high nibble into lower nibble
 	add a, #'0' ; Convert value to ASCII
 	lcall SendSerial
 
-	mov a, bcd+1
+	mov a, bcd+0
 	anl a, #0x0F ; Isolate 0.01 place
 	add a, #'0' ; Convert value to ASCII
 	lcall SendSerial
