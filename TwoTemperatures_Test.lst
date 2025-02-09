@@ -24,11 +24,11 @@
 0000             26   TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
 0000             27   
 0000             28   SAMPLES_PER_DISPLAY equ 300 
-0000             29   REFRESHES_PER_SECOND equ 30 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
+0000             29   REFRESHES_PER_SECOND equ 45 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
 0000             30   TIMER0_DENOM equ (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
 0000             31   
 0000             32   ORG 0x0000
-0000 0203FA      33            ljmp main
+0000 02040C      33            ljmp main
 0003             34   
 0003             35   ;                     1234567890123456    <- This helps determine the location of the counter
 0003 43757272    36   test_message:     db 'Current Temp.:', 0
@@ -113,8 +113,8 @@
 0387            114   wait_1ms:
 0387 C28C       115            clr     TR0 ; Stop timer 0
 0389 C28D       116            clr     TF0 ; Clear overflow flag
-038B 758CF8     117            mov     TH0, #high(TIMER0_RELOAD)
-038E 758ACC     118            mov     TL0,#low(TIMER0_RELOAD)
+038B 758CFB     117            mov     TH0, #high(TIMER0_RELOAD)
+038E 758A33     118            mov     TL0,#low(TIMER0_RELOAD)
 0391 D28C       119            setb TR0
 0393 308DFD     120            jnb     TF0, $ ; Wait for overflow
 0396 22         121            ret
@@ -137,332 +137,334 @@
 03A9 A83A       133            mov r0, bcd+2
 03AB 1200B7     133            lcall ?Display_BCD
 03AE D000       133            pop ar0
-03B0 C0E0       134            push acc
-03B2 742E       134            mov a, #'.'
-03B4 120068     134            lcall ?WriteData
-03B7 D0E0       134            pop acc
-03B9 C000       135            push ar0
-03BB A839       135            mov r0, bcd+1
-03BD 1200B7     135            lcall ?Display_BCD
-03C0 D000       135            pop ar0
-03C2 C0E0       136            push acc
-03C4 74DF       136            mov a, #0xDF
-03C6 120068     136            lcall ?WriteData
-03C9 D0E0       136            pop acc
+03B0 C000       134            push ar0
+03B2 A839       134            mov r0, bcd+1
+03B4 1200B7     134            lcall ?Display_BCD
+03B7 D000       134            pop ar0
+03B9 C0E0       135            push acc
+03BB 742E       135            mov a, #'.'
+03BD 120068     135            lcall ?WriteData
+03C0 D0E0       135            pop acc
+03C2 C000       136            push ar0
+03C4 A838       136            mov r0, bcd+0
+03C6 1200B7     136            lcall ?Display_BCD
+03C9 D000       136            pop ar0
 03CB C0E0       137            push acc
-03CD 7407       137            mov a, #7
-03CF 14         137            dec a
-03D0 1200B0     137            lcall ?Set_Cursor_2 ; Select column and row
-03D3 D0E0       137            pop acc
-03D5 C0E0       138            push acc
-03D7 7443       138            mov a, #'C'
-03D9 120068     138            lcall ?WriteData
-03DC D0E0       138            pop acc
-03DE 22         139            ret
-03DF            140   
-03DF            141   Read_ADC:
-03DF C2EF       142            clr ADCF
-03E1 D2EE       143            setb ADCS ;  ADC start trigger signal
-03E3 30EFFD     144       jnb ADCF, $ ; Wait for conversion complete
-03E6            145       
-03E6            146       ; Read the ADC result and store in [R1, R0]
-03E6 E5C2       147       mov a, ADCRL
-03E8 540F       148       anl a, #0x0f
-03EA F8         149       mov R0, a
-03EB E5C3       150       mov a, ADCRH   
-03ED C4         151       swap a
-03EE C0E0       152       push acc
-03F0 540F       153       anl a, #0x0f
-03F2 F9         154       mov R1, a
-03F3 D0E0       155       pop acc
-03F5 54F0       156       anl a, #0xf0
-03F7 48         157       orl a, R0
-03F8 F8         158       mov R0, A
-03F9 22         159            ret
-03FA            160   
-03FA            161   main:
-03FA 75817F     162            mov sp, #0x7f
-03FD 12033D     163            lcall Init_All
-0400 120072     164       lcall LCD_4BIT
-0403            165   
-0403 754501     166            mov MeasurementCounter+0, #1
-0406 754600     167            mov MeasurementCounter+1, #0
-0409            168   
-0409 754901     169            mov TimePerSample, #1
-040C            170   
-040C 75472C     171            mov SamplesPerDisplay+0, #low(SAMPLES_PER_DISPLAY)
-040F 754801     172            mov SamplesPerDisplay+1, #high(SAMPLES_PER_DISPLAY)
-0412            173            
-0412 754A00     174            mov LastMeasurement+0, #0
-0415 754B00     175            mov LastMeasurement+1, #0
-0418 754C00     176            mov LastMeasurement+2, #0
-041B 754D00     177            mov LastMeasurement+3, #0
-041E            178       
-041E            179       ; initial messages in LCD
-041E C0E0       180            push acc
-0420 7401       180            mov a, #1
-0422 14         180            dec a
-0423 1200B2     180            lcall ?Set_Cursor_1 ; Select column and row
-0426 D0E0       180            pop acc
-0428 C083       181            push dph
-042A C082       181            push dpl
-042C C0E0       181            push acc
-042E 900003     181            mov dptr, #test_message
-0431 1200A5     181            lcall ?Send_Constant_String
-0434 D0E0       181            pop acc
-0436 D082       181            pop dpl
-0438 D083       181            pop dph
-043A 02047B     182            ljmp Forever
-043D            183   
-043D            184   SendBCD:
-043D E53A       185            mov a, bcd+2
-043F 54F0       186            anl a, #0xF0 ; Isolate tens place
-0441 C4         187            swap a ; Put high nibble into lower nibble
-0442 2430       188            add a, #'0' ; Convert value to ASCII
-0444 120473     189            lcall SendSerial
-0447            190   
-0447 E53A       191            mov a, bcd+2
-0449 540F       192            anl a, #0x0F ; Isolate ones place
-044B 2430       193            add a, #'0' ; Convert value to ASCII
-044D 120473     194            lcall SendSerial
-0450            195   
-0450 742E       196            mov a, #'.'
-0452 120473     197            lcall SendSerial
-0455            198   
-0455 E539       199            mov a, bcd+1
-0457 54F0       200            anl a, #0xF0 ; Isolate 0.1 place
-0459 C4         201            swap a ; Put high nibble into lower nibble
-045A 2430       202            add a, #'0' ; Convert value to ASCII
-045C 120473     203            lcall SendSerial
-045F            204   
-045F E539       205            mov a, bcd+1
-0461 540F       206            anl a, #0x0F ; Isolate 0.01 place
-0463 2430       207            add a, #'0' ; Convert value to ASCII
-0465 120473     208            lcall SendSerial
-0468            209   
-0468 740A       210            mov a, #'\n'
-046A 120473     211            lcall SendSerial
-046D            212   
-046D 740D       213            mov a, #'\r'
-046F 120473     214            lcall SendSerial
-0472            215   
-0472 22         216            ret
-0473            217   
-0473            218   SendSerial:
-0473 C299       219            clr TI
-0475 F599       220            mov SBUF, a
-0477 3099FD     221            jnb TI, $
-047A 22         222            ret
-047B            223   
-047B            224   Forever:
-047B            225   
-047B            226            ; Read the 4.096V LM4040 voltage connected to AIN0 on pin 6
-047B 53E8F0     227            anl ADCCON0, #0xF0
-047E 43E800     228            orl ADCCON0, #0x00 ; Select channel 0
-0481            229   
-0481 1203DF     230            lcall Read_ADC
-0484            231            ; Save result for later use
-0484 883D       232            mov VAL_LM4040+0, R0
-0486 893E       233            mov VAL_LM4040+1, R1
-0488            234   
-0488            235            ; Read the signal connected to AIN7 (This reads the LM335)
-0488 53E8F0     236            anl ADCCON0, #0xF0
-048B 43E807     237            orl ADCCON0, #0x07 ; Select channel 7
-048E 1203DF     238            lcall Read_ADC
-0491            239       
-0491            240       ; Convert to voltage
-0491 8830       241            mov x+0, R0
-0493 8931       242            mov x+1, R1
-0495            243            ; Pad other bits with zero
-0495 753200     244            mov x+2, #0
-0498 753300     245            mov x+3, #0
-049B 7534FF     246            mov y+0, #low (40959 % 0x10000) 
-049E 75359F     246            mov y+1, #high(40959 % 0x10000) 
-04A1 753600     246            mov y+2, #low (40959 / 0x10000) 
-04A4 753700     246            mov y+3, #high(40959 / 0x10000)  ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
-04A7 120247     247            lcall mul32
-04AA            248            ; Retrive the ADC LM4040 value
-04AA 853D34     249            mov y+0, VAL_LM4040+0
-04AD 853E35     250            mov y+1, VAL_LM4040+1
-04B0            251            ; Pad other bits with zero
-04B0 753600     252            mov y+2, #0
-04B3 753700     253            mov y+3, #0
-04B6 1202D4     254            lcall div32
-04B9            255   
-04B9            256   
-04B9 853F34     257            mov y+0, StoreMeasurements+0
-04BC 854035     258            mov y+1, StoreMeasurements+1
-04BF 854136     259            mov y+2, StoreMeasurements+2
-04C2 854237     260            mov y+3, StoreMeasurements+3
-04C5            261   
-04C5 120192     262            lcall add32
-04C8            263            
-04C8 85303F     264            mov StoreMeasurements+0, x+0
-04CB 853140     265            mov StoreMeasurements+1, x+1
-04CE 853241     266            mov StoreMeasurements+2, x+2
-04D1 853342     267            mov StoreMeasurements+3, x+3
-04D4            268            
-04D4            269   ;;;SPLIT
-04D4            270   
-04D4            271            ; Read the signal connected to AIN4 Tthis reads analog signal of the OP07/Thermocouple)
-04D4 53E8F0     272            anl ADCCON0, #0xF0
-04D7 43E804     273            orl ADCCON0, #0x04 ; Select channel 4
-04DA 1203DF     274            lcall Read_ADC
-04DD            275       
-04DD            276       ; Convert to voltage
-04DD 8830       277            mov x+0, R0
-04DF 8931       278            mov x+1, R1
-04E1            279            ; Pad other bits with zero
-04E1 753200     280            mov x+2, #0
-04E4 753300     281            mov x+3, #0
-04E7 7534FF     282            mov y+0, #low (40959 % 0x10000) 
-04EA 75359F     282            mov y+1, #high(40959 % 0x10000) 
-04ED 753600     282            mov y+2, #low (40959 / 0x10000) 
-04F0 753700     282            mov y+3, #high(40959 / 0x10000)  ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
-04F3 120247     283            lcall mul32
-04F6            284            ; Retrive the ADC LM4040 value
-04F6 853D34     285            mov y+0, VAL_LM4040+0
-04F9 853E35     286            mov y+1, VAL_LM4040+1
-04FC            287            ; Pad other bits with zero
-04FC 753600     288            mov y+2, #0
-04FF 753700     289            mov y+3, #0
-0502 1202D4     290            lcall div32
-0505            291   
-0505            292   
-0505 854E34     293            mov y+0, StoreThermocouple+0
-0508 854F35     294            mov y+1, StoreThermocouple+1
-050B 855036     295            mov y+2, StoreThermocouple+2
-050E 855137     296            mov y+3, StoreThermocouple+3
-0511            297   
-0511 120192     298            lcall add32
-0514            299            
-0514 85304E     300            mov StoreThermocouple+0, x+0
-0517 85314F     301            mov StoreThermocouple+1, x+1
-051A 853250     302            mov StoreThermocouple+2, x+2
-051D 853351     303            mov StoreThermocouple+3, x+3
-0520            304   
-0520 AA49       305            mov R2, TimePerSample
-0522 120397     306            lcall waitms
-0525            307   
-0525            308            ;Checks if enough measurements have been taken
-0525            309            
-0525 1545       310            dec MeasurementCounter+0
-0527 E545       311            mov a, MeasurementCounter+0
-0529 B4FF02     312            cjne a, #0xFF, CheckHigh
-052C 1546       313            dec MeasurementCounter+1
-052E            314            CheckHigh:
-052E E545       315            mov a, MeasurementCounter+0
-0530 4546       316            orl a, MeasurementCounter+1
-0532 6003       317            jz DisplayValue
-0534 020606     318            ljmp EndForever
-0537            319            
-0537            320            ;Divides stored measurements by number of measurements taken
-0537            321   DisplayValue:    
-0537 753400     322            mov y+0, #low (0 % 0x10000) 
-053A 753500     322            mov y+1, #high(0 % 0x10000) 
-053D 753600     322            mov y+2, #low (0 / 0x10000) 
-0540 753700     322            mov y+3, #high(0 / 0x10000) 
-0543            323            
-0543 853F30     324            mov x+0, StoreMeasurements+0
-0546 854031     325            mov x+1, StoreMeasurements+1
-0549 854132     326            mov x+2, StoreMeasurements+2
-054C 854233     327            mov x+3, StoreMeasurements+3
-054F            328            
-054F E547       329            mov a, SamplesPerDisplay+0
-0551 F534       330            mov y+0, a
-0553 F545       331            mov MeasurementCounter+0, a
-0555            332   
-0555 E548       333            mov a, SamplesPerDisplay+1
-0557 F535       334            mov y+1, a
-0559 F546       335            mov MeasurementCounter+1, a     
-055B            336            
-055B 1202D4     337            lcall div32
-055E            338            
-055E 753464     339            mov y+0, #low (100 % 0x10000) 
-0561 753500     339            mov y+1, #high(100 % 0x10000) 
-0564 753600     339            mov y+2, #low (100 / 0x10000) 
-0567 753700     339            mov y+3, #high(100 / 0x10000) 
-056A 120247     340            lcall mul32
-056D            341   
-056D 753410     342            mov y+0, #low (2730000 % 0x10000) 
-0570 7535A8     342            mov y+1, #high(2730000 % 0x10000) 
-0573 753629     342            mov y+2, #low (2730000 / 0x10000) 
-0576 753700     342            mov y+3, #high(2730000 / 0x10000) 
-0579 1201B3     343            lcall sub32
-057C            344            
-057C 853052     345            mov FinalLM335+0, x+0 ;Stores final LM335 value in degrees C
-057F 853153     346            mov FinalLM335+1, x+1
-0582 853254     347            mov FinalLM335+2, x+2
-0585 853355     348            mov FinalLM335+3, x+3
-0588            349            
-0588            350            ;Does same as above, but for the thermocouple
-0588            351            
-0588 753400     352            mov y+0, #low (0 % 0x10000) 
-058B 753500     352            mov y+1, #high(0 % 0x10000) 
-058E 753600     352            mov y+2, #low (0 / 0x10000) 
-0591 753700     352            mov y+3, #high(0 / 0x10000) 
-0594            353            
-0594 854E30     354            mov x+0, StoreThermocouple+0
-0597 854F31     355            mov x+1, StoreThermocouple+1
-059A 855032     356            mov x+2, StoreThermocouple+2
-059D 855133     357            mov x+3, StoreThermocouple+3
-05A0            358            
-05A0 E547       359            mov a, SamplesPerDisplay+0
-05A2 F534       360            mov y+0, a
-05A4 F545       361            mov MeasurementCounter+0, a
-05A6            362   
-05A6 E548       363            mov a, SamplesPerDisplay+1
-05A8 F535       364            mov y+1, a
-05AA F546       365            mov MeasurementCounter+1, a     
-05AC            366            
-05AC 1202D4     367            lcall div32
+03CD 74DF       137            mov a, #0xDF
+03CF 120068     137            lcall ?WriteData
+03D2 D0E0       137            pop acc
+03D4 C0E0       138            push acc
+03D6 7443       138            mov a, #'C'
+03D8 120068     138            lcall ?WriteData
+03DB D0E0       138            pop acc
+03DD C0E0       139            push acc
+03DF 7401       139            mov a, #1
+03E1 14         139            dec a
+03E2 1200B0     139            lcall ?Set_Cursor_2 ; Select column and row
+03E5 D0E0       139            pop acc
+03E7 C0E0       140            push acc
+03E9 7420       140            mov a, #' '
+03EB 120068     140            lcall ?WriteData
+03EE D0E0       140            pop acc
+03F0 22         141            ret
+03F1            142   
+03F1            143   Read_ADC:
+03F1 C2EF       144            clr ADCF
+03F3 D2EE       145            setb ADCS ;  ADC start trigger signal
+03F5 30EFFD     146       jnb ADCF, $ ; Wait for conversion complete
+03F8            147       
+03F8            148       ; Read the ADC result and store in [R1, R0]
+03F8 E5C2       149       mov a, ADCRL
+03FA 540F       150       anl a, #0x0f
+03FC F8         151       mov R0, a
+03FD E5C3       152       mov a, ADCRH   
+03FF C4         153       swap a
+0400 C0E0       154       push acc
+0402 540F       155       anl a, #0x0f
+0404 F9         156       mov R1, a
+0405 D0E0       157       pop acc
+0407 54F0       158       anl a, #0xf0
+0409 48         159       orl a, R0
+040A F8         160       mov R0, A
+040B 22         161            ret
+040C            162   
+040C            163   main:
+040C 75817F     164            mov sp, #0x7f
+040F 12033D     165            lcall Init_All
+0412 120072     166       lcall LCD_4BIT
+0415            167   
+0415 754501     168            mov MeasurementCounter+0, #1
+0418 754600     169            mov MeasurementCounter+1, #0
+041B            170   
+041B 754901     171            mov TimePerSample, #1
+041E            172   
+041E 75472C     173            mov SamplesPerDisplay+0, #low(SAMPLES_PER_DISPLAY)
+0421 754801     174            mov SamplesPerDisplay+1, #high(SAMPLES_PER_DISPLAY)
+0424            175            
+0424 754A00     176            mov LastMeasurement+0, #0
+0427 754B00     177            mov LastMeasurement+1, #0
+042A 754C00     178            mov LastMeasurement+2, #0
+042D 754D00     179            mov LastMeasurement+3, #0
+0430            180       
+0430            181       ; initial messages in LCD
+0430 C0E0       182            push acc
+0432 7401       182            mov a, #1
+0434 14         182            dec a
+0435 1200B2     182            lcall ?Set_Cursor_1 ; Select column and row
+0438 D0E0       182            pop acc
+043A C083       183            push dph
+043C C082       183            push dpl
+043E C0E0       183            push acc
+0440 900003     183            mov dptr, #test_message
+0443 1200A5     183            lcall ?Send_Constant_String
+0446 D0E0       183            pop acc
+0448 D082       183            pop dpl
+044A D083       183            pop dph
+044C 02048D     184            ljmp Forever
+044F            185   
+044F            186   SendBCD:
+044F E53A       187            mov a, bcd+2
+0451 54F0       188            anl a, #0xF0 ; Isolate tens place
+0453 C4         189            swap a ; Put high nibble into lower nibble
+0454 2430       190            add a, #'0' ; Convert value to ASCII
+0456 120485     191            lcall SendSerial
+0459            192   
+0459 E53A       193            mov a, bcd+2
+045B 540F       194            anl a, #0x0F ; Isolate ones place
+045D 2430       195            add a, #'0' ; Convert value to ASCII
+045F 120485     196            lcall SendSerial
+0462            197   
+0462 742E       198            mov a, #'.'
+0464 120485     199            lcall SendSerial
+0467            200   
+0467 E539       201            mov a, bcd+1
+0469 54F0       202            anl a, #0xF0 ; Isolate 0.1 place
+046B C4         203            swap a ; Put high nibble into lower nibble
+046C 2430       204            add a, #'0' ; Convert value to ASCII
+046E 120485     205            lcall SendSerial
+0471            206   
+0471 E539       207            mov a, bcd+1
+0473 540F       208            anl a, #0x0F ; Isolate 0.01 place
+0475 2430       209            add a, #'0' ; Convert value to ASCII
+0477 120485     210            lcall SendSerial
+047A            211   
+047A 740A       212            mov a, #'\n'
+047C 120485     213            lcall SendSerial
+047F            214   
+047F 740D       215            mov a, #'\r'
+0481 120485     216            lcall SendSerial
+0484            217   
+0484 22         218            ret
+0485            219   
+0485            220   SendSerial:
+0485 C299       221            clr TI
+0487 F599       222            mov SBUF, a
+0489 3099FD     223            jnb TI, $
+048C 22         224            ret
+048D            225   
+048D            226   Forever:
+048D            227   
+048D            228            ; Read the 4.096V LM4040 voltage connected to AIN0 on pin 6
+048D 53E8F0     229            anl ADCCON0, #0xF0
+0490 43E800     230            orl ADCCON0, #0x00 ; Select channel 0
+0493            231   
+0493 1203F1     232            lcall Read_ADC
+0496            233            ; Save result for later use
+0496 883D       234            mov VAL_LM4040+0, R0
+0498 893E       235            mov VAL_LM4040+1, R1
+049A            236   
+049A            237            ; Read the signal connected to AIN7 (This reads the LM335)
+049A 53E8F0     238            anl ADCCON0, #0xF0
+049D 43E807     239            orl ADCCON0, #0x07 ; Select channel 7
+04A0 1203F1     240            lcall Read_ADC
+04A3            241       
+04A3            242       ; Convert to voltage
+04A3 8830       243            mov x+0, R0
+04A5 8931       244            mov x+1, R1
+04A7            245            ; Pad other bits with zero
+04A7 753200     246            mov x+2, #0
+04AA 753300     247            mov x+3, #0
+04AD 7534FF     248            mov y+0, #low (40959 % 0x10000) 
+04B0 75359F     248            mov y+1, #high(40959 % 0x10000) 
+04B3 753600     248            mov y+2, #low (40959 / 0x10000) 
+04B6 753700     248            mov y+3, #high(40959 / 0x10000)  ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
+04B9 120247     249            lcall mul32
+04BC            250            ; Retrive the ADC LM4040 value
+04BC 853D34     251            mov y+0, VAL_LM4040+0
+04BF 853E35     252            mov y+1, VAL_LM4040+1
+04C2            253            ; Pad other bits with zero
+04C2 753600     254            mov y+2, #0
+04C5 753700     255            mov y+3, #0
+04C8 1202D4     256            lcall div32
+04CB            257   
+04CB            258   
+04CB 853F34     259            mov y+0, StoreMeasurements+0
+04CE 854035     260            mov y+1, StoreMeasurements+1
+04D1 854136     261            mov y+2, StoreMeasurements+2
+04D4 854237     262            mov y+3, StoreMeasurements+3
+04D7            263   
+04D7 120192     264            lcall add32
+04DA            265            
+04DA 85303F     266            mov StoreMeasurements+0, x+0
+04DD 853140     267            mov StoreMeasurements+1, x+1
+04E0 853241     268            mov StoreMeasurements+2, x+2
+04E3 853342     269            mov StoreMeasurements+3, x+3
+04E6            270            
+04E6            271   ;;;SPLIT
+04E6            272   
+04E6            273            ; Read the signal connected to AIN4 Tthis reads analog signal of the OP07/Thermocouple)
+04E6 53E8F0     274            anl ADCCON0, #0xF0
+04E9 43E804     275            orl ADCCON0, #0x04 ; Select channel 4
+04EC 1203F1     276            lcall Read_ADC
+04EF            277       
+04EF            278       ; Convert to voltage
+04EF 8830       279            mov x+0, R0
+04F1 8931       280            mov x+1, R1
+04F3            281            ; Pad other bits with zero
+04F3 753200     282            mov x+2, #0
+04F6 753300     283            mov x+3, #0
+04F9 7534FF     284            mov y+0, #low (40959 % 0x10000) 
+04FC 75359F     284            mov y+1, #high(40959 % 0x10000) 
+04FF 753600     284            mov y+2, #low (40959 / 0x10000) 
+0502 753700     284            mov y+3, #high(40959 / 0x10000)  ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
+0505 120247     285            lcall mul32
+0508            286            ; Retrive the ADC LM4040 value
+0508 853D34     287            mov y+0, VAL_LM4040+0
+050B 853E35     288            mov y+1, VAL_LM4040+1
+050E            289            ; Pad other bits with zero
+050E 753600     290            mov y+2, #0
+0511 753700     291            mov y+3, #0
+0514 1202D4     292            lcall div32
+0517            293   
+0517            294   
+0517 854E34     295            mov y+0, StoreThermocouple+0
+051A 854F35     296            mov y+1, StoreThermocouple+1
+051D 855036     297            mov y+2, StoreThermocouple+2
+0520 855137     298            mov y+3, StoreThermocouple+3
+0523            299   
+0523 120192     300            lcall add32
+0526            301            
+0526 85304E     302            mov StoreThermocouple+0, x+0
+0529 85314F     303            mov StoreThermocouple+1, x+1
+052C 853250     304            mov StoreThermocouple+2, x+2
+052F 853351     305            mov StoreThermocouple+3, x+3
+0532            306   
+0532 AA49       307            mov R2, TimePerSample
+0534 120397     308            lcall waitms
+0537            309   
+0537            310            ;Checks if enough measurements have been taken
+0537            311            
+0537 1545       312            dec MeasurementCounter+0
+0539 E545       313            mov a, MeasurementCounter+0
+053B B4FF02     314            cjne a, #0xFF, CheckHigh
+053E 1546       315            dec MeasurementCounter+1
+0540            316            CheckHigh:
+0540 E545       317            mov a, MeasurementCounter+0
+0542 4546       318            orl a, MeasurementCounter+1
+0544 6003       319            jz DisplayValue
+0546 0205FA     320            ljmp EndForever
+0549            321            
+0549            322            ;Divides stored measurements by number of measurements taken
+0549            323   DisplayValue:    
+0549 753400     324            mov y+0, #low (0 % 0x10000) 
+054C 753500     324            mov y+1, #high(0 % 0x10000) 
+054F 753600     324            mov y+2, #low (0 / 0x10000) 
+0552 753700     324            mov y+3, #high(0 / 0x10000) 
+0555            325            
+0555 853F30     326            mov x+0, StoreMeasurements+0
+0558 854031     327            mov x+1, StoreMeasurements+1
+055B 854132     328            mov x+2, StoreMeasurements+2
+055E 854233     329            mov x+3, StoreMeasurements+3
+0561            330            
+0561 E547       331            mov a, SamplesPerDisplay+0
+0563 F534       332            mov y+0, a
+0565 F545       333            mov MeasurementCounter+0, a
+0567            334   
+0567 E548       335            mov a, SamplesPerDisplay+1
+0569 F535       336            mov y+1, a
+056B F546       337            mov MeasurementCounter+1, a     
+056D            338            
+056D 1202D4     339            lcall div32
+0570            340            
+0570            341            ;Load_y(100)
+0570            342            ;lcall mul32
+0570            343   
+0570 7534A4     344            mov y+0, #low (27300 % 0x10000) 
+0573 75356A     344            mov y+1, #high(27300 % 0x10000) 
+0576 753600     344            mov y+2, #low (27300 / 0x10000) 
+0579 753700     344            mov y+3, #high(27300 / 0x10000) 
+057C 1201B3     345            lcall sub32
+057F            346            
+057F 853052     347            mov FinalLM335+0, x+0 ;Stores final LM335 value in degrees C
+0582 853153     348            mov FinalLM335+1, x+1
+0585 853254     349            mov FinalLM335+2, x+2
+0588 853355     350            mov FinalLM335+3, x+3
+058B            351            
+058B            352            ;Does same as above, but for the thermocouple
+058B            353            
+058B 753400     354            mov y+0, #low (0 % 0x10000) 
+058E 753500     354            mov y+1, #high(0 % 0x10000) 
+0591 753600     354            mov y+2, #low (0 / 0x10000) 
+0594 753700     354            mov y+3, #high(0 / 0x10000) 
+0597            355            
+0597 854E30     356            mov x+0, StoreThermocouple+0
+059A 854F31     357            mov x+1, StoreThermocouple+1
+059D 855032     358            mov x+2, StoreThermocouple+2
+05A0 855133     359            mov x+3, StoreThermocouple+3
+05A3            360            
+05A3 E547       361            mov a, SamplesPerDisplay+0
+05A5 F534       362            mov y+0, a
+05A7 F545       363            mov MeasurementCounter+0, a
+05A9            364   
+05A9 E548       365            mov a, SamplesPerDisplay+1
+05AB F535       366            mov y+1, a
+05AD F546       367            mov MeasurementCounter+1, a     
 05AF            368            
-05AF 753464     369            mov y+0, #low (100 % 0x10000) 
-05B2 753500     369            mov y+1, #high(100 % 0x10000) 
-05B5 753600     369            mov y+2, #low (100 / 0x10000) 
-05B8 753700     369            mov y+3, #high(100 / 0x10000) 
-05BB 120247     370            lcall mul32 ;Note that the final thermocouple value in degrees C is now stored in x
-05BE            371            
-05BE 753400     372            mov y+0, #low (0 % 0x10000) 
-05C1 753500     372            mov y+1, #high(0 % 0x10000) 
-05C4 753600     372            mov y+2, #low (0 / 0x10000) 
-05C7 753700     372            mov y+3, #high(0 / 0x10000) 
-05CA 855234     373            mov y+0, FinalLM335+0
-05CD 855335     374            mov y+1, FinalLM335+1
-05D0 855436     375            mov y+2, FinalLM335+2
-05D3 855537     376            mov y+3, FinalLM335+3
-05D6            377   
-05D6            378            
-05D6 120192     379            lcall add32 ; Puts the final temperature value into x
-05D9            380            
-05D9            381            
-05D9            382            ; Convert to BCD and display
-05D9 1200CD     383            lcall hex2bcd
-05DC 12039D     384            lcall Display_formated_BCD
-05DF            385   
-05DF 12043D     386            lcall SendBCD
-05E2            387   
-05E2 753F00     388            mov StoreMeasurements+0, #0
-05E5 754000     389            mov StoreMeasurements+1, #0
-05E8 754100     390            mov StoreMeasurements+2, #0
-05EB 754200     391            mov StoreMeasurements+3, #0
-05EE            392            
-05EE 754E00     393            mov StoreThermocouple+0, #0
-05F1 754F00     394            mov StoreThermocouple+1, #0
-05F4 755000     395            mov StoreThermocouple+2, #0
-05F7 755100     396            mov StoreThermocouple+3, #0
-05FA            397            
-05FA 755200     398            mov FinalLM335+0, #0
-05FD 755301     399            mov FinalLM335+1, #1
-0600 755402     400            mov FinalLM335+2, #2
-0603 755503     401            mov FinalLM335+3, #3
-0606            402   
-0606            403   
-0606            404   EndForever:
-0606 753000     405            mov x+0, #0
-0609 753100     406            mov x+1, #0
-060C 753200     407            mov x+2, #0
-060F 753300     408            mov x+3, #0
-0612 02047B     409            ljmp Forever
-0615            410   
-0615            411   END
+05AF 1202D4     369            lcall div32
+05B2            370            
+05B2            371            ;Load_y(100)
+05B2            372            ;lcall mul32 ;Note that the final thermocouple value in degrees C is now stored in x
+05B2            373            
+05B2 753400     374            mov y+0, #low (0 % 0x10000) 
+05B5 753500     374            mov y+1, #high(0 % 0x10000) 
+05B8 753600     374            mov y+2, #low (0 / 0x10000) 
+05BB 753700     374            mov y+3, #high(0 / 0x10000) 
+05BE 855234     375            mov y+0, FinalLM335+0
+05C1 855335     376            mov y+1, FinalLM335+1
+05C4 855436     377            mov y+2, FinalLM335+2
+05C7 855537     378            mov y+3, FinalLM335+3
+05CA            379   
+05CA            380            
+05CA 120192     381            lcall add32 ; Puts the final temperature value into x
+05CD            382            
+05CD            383            
+05CD            384            ; Convert to BCD and display
+05CD 1200CD     385            lcall hex2bcd
+05D0 12039D     386            lcall Display_formated_BCD
+05D3            387   
+05D3 12044F     388            lcall SendBCD
+05D6            389   
+05D6 753F00     390            mov StoreMeasurements+0, #0
+05D9 754000     391            mov StoreMeasurements+1, #0
+05DC 754100     392            mov StoreMeasurements+2, #0
+05DF 754200     393            mov StoreMeasurements+3, #0
+05E2            394            
+05E2 754E00     395            mov StoreThermocouple+0, #0
+05E5 754F00     396            mov StoreThermocouple+1, #0
+05E8 755000     397            mov StoreThermocouple+2, #0
+05EB 755100     398            mov StoreThermocouple+3, #0
+05EE            399            
+05EE 755200     400            mov FinalLM335+0, #0
+05F1 755301     401            mov FinalLM335+1, #1
+05F4 755402     402            mov FinalLM335+2, #2
+05F7 755503     403            mov FinalLM335+3, #3
+05FA            404   
+05FA            405   
+05FA            406   EndForever:
+05FA 753000     407            mov x+0, #0
+05FD 753100     408            mov x+1, #0
+0600 753200     409            mov x+2, #0
+0603 753300     410            mov x+3, #0
+0606 02048D     411            ljmp Forever
+0609            412   
+0609            413   END

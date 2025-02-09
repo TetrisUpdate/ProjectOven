@@ -26,7 +26,7 @@ TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
 
 SAMPLES_PER_DISPLAY equ 300 
-REFRESHES_PER_SECOND equ 30 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
+REFRESHES_PER_SECOND equ 45 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
 TIMER0_DENOM equ (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
 
 ORG 0x0000
@@ -131,11 +131,13 @@ waitms:
 Display_formated_BCD:
 	Set_Cursor(2, 1)
 	Display_BCD(bcd+2)
-	Display_char(#'.')
 	Display_BCD(bcd+1)
+	Display_char(#'.')
+	Display_BCD(bcd+0)
 	Display_char(#0xDF)
-	Set_Cursor(2,7)
 	Display_char(#'C')
+	Set_Cursor(2,1)
+	Display_char(#' ')
 	ret
 
 Read_ADC:
@@ -336,10 +338,10 @@ DisplayValue:
 	
 	lcall div32
 	
-	Load_y(100)
-	lcall mul32
+	;Load_y(100)
+	;lcall mul32
 
-	load_y(2730000)
+	load_y(27300)
 	lcall sub32
 	
 	mov FinalLM335+0, x+0 ;Stores final LM335 value in degrees C
@@ -366,8 +368,8 @@ DisplayValue:
 	
 	lcall div32
 	
-	Load_y(100)
-	lcall mul32 ;Note that the final thermocouple value in degrees C is now stored in x
+	;Load_y(100)
+	;lcall mul32 ;Note that the final thermocouple value in degrees C is now stored in x
 	
 	Load_y(0)
 	mov y+0, FinalLM335+0
