@@ -269,6 +269,7 @@ Forever:
 	mov StoreMeasurements+3, x+3
 	
 
+
 	; Read the signal connected to AIN4 (this reads analog signal of the OP07/Thermocouple)
 	anl ADCCON0, #0xF0
 	orl ADCCON0, #0x04 ; Select channel 4
@@ -370,13 +371,14 @@ DisplayValue:
 	;Load_y(100)
 	;lcall mul32 ;Note that the final thermocouple value in degrees C is now stored in x
 	
-	Load_y(0)
-	mov y+0, FinalLM335+0
-	mov y+1, FinalLM335+1
-	mov y+2, FinalLM335+2
-	mov y+3, FinalLM335+3
+	;Load_y(0)
+	;mov y+0, FinalLM335+0
+	;mov y+1, FinalLM335+1
+	;mov y+2, FinalLM335+2
+	;mov y+3, FinalLM335+3
 
-	
+	load_y(2200)
+
 	lcall add32 ; Puts the final temperature value into x
 	
 	
