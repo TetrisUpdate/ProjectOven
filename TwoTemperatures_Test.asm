@@ -25,8 +25,8 @@ BAUD              EQU 115200 ; Baud rate of UART in bps
 TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
 
-SAMPLES_PER_DISPLAY equ 255 
-REFRESHES_PER_SECOND equ 16 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
+SAMPLES_PER_DISPLAY equ 300 
+REFRESHES_PER_SECOND equ 30 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
 TIMER0_DENOM equ (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
 
 ORG 0x0000
@@ -63,6 +63,8 @@ MeasurementCounter: ds 2
 SamplesPerDisplay: ds 2
 TimePerSample: ds 1
 LastMeasurement: ds 4
+StoreThermocouple: ds 4
+FinalLM335: ds 4
 
 BSEG
 mf: dbit 1
@@ -221,7 +223,7 @@ SendSerial:
 
 Forever:
 
-	; Read the 2.08V LM4040 voltage connected to AIN0 on pin 6
+	; Read the 4.096V LM4040 voltage connected to AIN0 on pin 6
 	anl ADCCON0, #0xF0
 	orl ADCCON0, #0x00 ; Select channel 0
 
@@ -230,7 +232,7 @@ Forever:
 	mov VAL_LM4040+0, R0
 	mov VAL_LM4040+1, R1
 
-	; Read the signal connected to AIN7 (for testing, this reads analog signal of opamp)
+	; Read the signal connected to AIN7 (This reads the LM335)
 	anl ADCCON0, #0xF0
 	orl ADCCON0, #0x07 ; Select channel 7
 	lcall Read_ADC
@@ -263,14 +265,48 @@ Forever:
 	mov StoreMeasurements+1, x+1
 	mov StoreMeasurements+2, x+2
 	mov StoreMeasurements+3, x+3
+	
+;;;SPLIT
+
+	; Read the signal connected to AIN4 Tthis reads analog signal of the OP07/Thermocouple)
+	anl ADCCON0, #0xF0
+	orl ADCCON0, #0x04 ; Select channel 4
+	lcall Read_ADC
+    
+    ; Convert to voltage
+	mov x+0, R0
+	mov x+1, R1
+	; Pad other bits with zero
+	mov x+2, #0
+	mov x+3, #0
+	Load_y(40959) ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
+	lcall mul32
+	; Retrive the ADC LM4040 value
+	mov y+0, VAL_LM4040+0
+	mov y+1, VAL_LM4040+1
+	; Pad other bits with zero
+	mov y+2, #0
+	mov y+3, #0
+	lcall div32
+
+
+	mov y+0, StoreThermocouple+0
+	mov y+1, StoreThermocouple+1
+	mov y+2, StoreThermocouple+2
+	mov y+3, StoreThermocouple+3
+
+	lcall add32
+	
+	mov StoreThermocouple+0, x+0
+	mov StoreThermocouple+1, x+1
+	mov StoreThermocouple+2, x+2
+	mov StoreThermocouple+3, x+3
 
 	mov R2, TimePerSample
 	lcall waitms
 
-	;dec MeasurementCounter
-	;mov a, MeasurementCounter
-	;jnz EndForever
-
+	;Checks if enough measurements have been taken
+	
 	dec MeasurementCounter+0
 	mov a, MeasurementCounter+0
 	cjne a, #0xFF, CheckHigh
@@ -278,9 +314,18 @@ Forever:
 	CheckHigh:
 	mov a, MeasurementCounter+0
 	orl a, MeasurementCounter+1
-	jnz EndForever
-
+	jz DisplayValue
+	ljmp EndForever
+	
+	;Divides stored measurements by number of measurements taken
+DisplayValue:	
 	Load_y(0)
+	
+	mov x+0, StoreMeasurements+0
+	mov x+1, StoreMeasurements+1
+	mov x+2, StoreMeasurements+2
+	mov x+3, StoreMeasurements+3
+	
 	mov a, SamplesPerDisplay+0
 	mov y+0, a
 	mov MeasurementCounter+0, a
@@ -288,33 +333,52 @@ Forever:
 	mov a, SamplesPerDisplay+1
 	mov y+1, a
 	mov MeasurementCounter+1, a	
+	
 	lcall div32
-
-	Load_y(1000)
+	
+	Load_y(100)
 	lcall mul32
 
-	;load_y(2730000)
-	;lcall sub32
+	load_y(2730000)
+	lcall sub32
 	
-	;Load_y(220000)
-	;lcall add32
+	mov FinalLM335+0, x+0 ;Stores final LM335 value in degrees C
+	mov FinalLM335+1, x+1
+	mov FinalLM335+2, x+2
+	mov FinalLM335+3, x+3
+	
+	;Does same as above, but for the thermocouple
+	
+	Load_y(0)
+	
+	mov x+0, StoreThermocouple+0
+	mov x+1, StoreThermocouple+1
+	mov x+2, StoreThermocouple+2
+	mov x+3, StoreThermocouple+3
+	
+	mov a, SamplesPerDisplay+0
+	mov y+0, a
+	mov MeasurementCounter+0, a
 
-	mov y+0, LastMeasurement+0
-	mov y+1, LastMeasurement+1
-	mov y+2, LastMeasurement+2
-	mov y+3, LastMeasurement+3
-
-	mov LastMeasurement+0, x+0
-	mov LastMeasurement+1, x+1
-	mov LastMeasurement+2, x+2
-	mov LastMeasurement+3, x+3
-
-	lcall add32
-	Load_y(2)
+	mov a, SamplesPerDisplay+1
+	mov y+1, a
+	mov MeasurementCounter+1, a	
+	
 	lcall div32
+	
+	Load_y(100)
+	lcall mul32 ;Note that the final thermocouple value in degrees C is now stored in x
+	
+	Load_y(0)
+	mov y+0, FinalLM335+0
+	mov y+1, FinalLM335+1
+	mov y+2, FinalLM335+2
+	mov y+3, FinalLM335+3
 
 	
-
+	lcall add32 ; Puts the final temperature value into x
+	
+	
 	; Convert to BCD and display
 	lcall hex2bcd
 	lcall Display_formated_BCD
@@ -325,6 +389,17 @@ Forever:
 	mov StoreMeasurements+1, #0
 	mov StoreMeasurements+2, #0
 	mov StoreMeasurements+3, #0
+	
+	mov StoreThermocouple+0, #0
+	mov StoreThermocouple+1, #0
+	mov StoreThermocouple+2, #0
+	mov StoreThermocouple+3, #0
+	
+	mov FinalLM335+0, #0
+	mov FinalLM335+1, #1
+	mov FinalLM335+2, #2
+	mov FinalLM335+3, #3
+
 
 EndForever:
 	mov x+0, #0
