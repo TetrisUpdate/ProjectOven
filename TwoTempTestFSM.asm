@@ -520,7 +520,8 @@ inc_value:
 	mov a, selected_state
 	cjne a, #1, c2i
 	inc temp_soak
-	ljmp u	jnb TI, $
+	ljmp update_state
+	jnb TI, $
 	ret
 
 Forever:
