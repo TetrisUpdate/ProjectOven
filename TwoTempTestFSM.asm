@@ -24,7 +24,7 @@ CLK               EQU 16600000 ; Microcontroller system frequency in Hz
 BAUD              EQU 115200 ; Baud rate of UART in bps
 TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
-TIMER2_RATE   EQU 1000   ; 1000Hz, for a timer tick of 1ms
+TIMER2_RATE   EQU 100; 100Hz, for a timer tick of 10ms
 TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 
 SAMPLES_PER_DISPLAY equ 300 
@@ -73,6 +73,8 @@ StoreThermocouple: ds 4
 CurrentTemp: ds 4
 FinalLM335: ds 4
 
+FinalTemp: ds 4
+
 Count1ms: ds 2
 pwm_counter: ds 1
 pwm: ds 1
@@ -89,11 +91,11 @@ BSEG
 mf: dbit 1
 
 start: dbit 1
-temp_lt_150: dbit 1
-seconds_lt_time_soak: dbit 1 
-temp_lt_220: dbit 1
-sec_lt_45: dbit 1
-temp_gt_60: dbit 1
+temp_state1: dbit 1 ; ramp to soak
+time_state2: dbit 1 ; preheat/soak
+temp_state3: dbit 1 ; ramp to peak
+time_state4: dbit 1 ; reflow
+temp_state5: dbit 1 ; cooling if temp less than 60
 
 $NOLIST
 $include(math32.inc)
@@ -142,10 +144,10 @@ Timer2_ISR:
 	mov SSR_BOX, c
 
 	mov a, pwm_counter
-	cjne a, #1000, Timer2_ISR_done
+	cjne a, #100, Timer2_ISR_done
 	mov pwm_counter, #0
 	inc seconds ; It is super easy to keep a seconds count here
-	setb s_flag
+	; setb s_flag (don't know what to do with this)
 
 
 Inc_Done:
@@ -168,46 +170,42 @@ State_0:
 	cjne start, #1, Timer2_ISR_done
 	mov state, #1
 	ljmp Timer2_ISR_done
+	
 State_1:
 	cjne state, #1, State_2
-	;mov pwm, #100
-	cjne temp_lt_150, #1, Timer2_ISR_done
-	mov pwr, #100
+	mov pwm, #100
+	cjne temp_state1, #0, Timer2_ISR_done ; temp_lt_150 should be compared to zero b/c the bit will be set to 0 when the temp is greater than 150, which is when we want to transition to the next state
 	mov seconds, #0
 	mov state, #2
+
 State_2: ;transition to state three if more than 60 seconds have passed
 	cjne state, #2, State_3
-	inc seconds
 	mov pwm, #20
-	mov a, time_soak ; time soak set by user so arbitrary time
-	clr c 			 ; clear the carry bit in case it was previously set
-	subb a, seconds	 ; we subtract seconbds by the arbitrary time value, note seconds is beign icnremented
-	jnc State_2
-	cjne seconds_lt_time_soak, #0, Timer2_ISR_done
-
+	cjne time_state2, #0, Timer2_ISR_done
 	mov seconds, #0		 	
 	mov state, #3
+
 State_3: 
 	cjne state, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
-	cjne temp_lt_220, #0, Timer2_ISR_done ; 
+	cjne temp_state3, #0, Timer2_ISR_done ; 
 	mov seconds, #0
 	mov state, #4
+
 State_4:
 	cjne state, #4, State_5
-	inc seconds 
 	mov pwm, #20
-	mov a, time_refl
-	clr c
-	subb a, seconds
-	jnc State_4
+	cjne time_state4, #0, Timer2_ISR_done
 	mov seconds, #0
 	mov state, #5
+
 State_5:
 	cjne state, #5, Timer2_ISR_done
-	cjne temp_gt_60, #1, Timer2_ISR_done
 	mov pwm, #0
+	cjne temp_state5, #1, Timer2_ISR_done
+	mov seconds, #0
 	mov state, #0
+
 State_error:
 	mov state, #0
 	
@@ -324,6 +322,7 @@ main:
 	mov temp_lt_150, #0
 	mov sec_lt_60, #0
 	mov temp_lt_220, #0
+	mov temp_gt_250, #0
 	mov sec_lt_45, #0
 	mov temp_gt_60, #0
 	
@@ -539,27 +538,55 @@ DisplayValue:
 	
 	lcall add32 ; Puts the final temperature value into x
 
-	;CHANGE THESE SO THAT WE MOVE THE VARIABLES INTO Y ONCE THEYRE SET UP, NOT JUST MOVING CONSTANTS INTO Y
-	Load_y(15000) ;if temp less than 150, temp_lt_150 = 1
-	lcall x_lteq_y
-	mov temp_lt_150, mf
+	mov FinalTemp+0, x+0
+	mov FinalTemp+1, x+1
+	mov FinalTemp+2, x+2
+	mov FinalTemp+3, x+3
 
-	Load_y(22000) ;if temp less than 220, temp_lt_220 = 1
-	lcall x_lteq_y
-	mov temp_lt_220, mf
+	;CHANGE THESE SO THAT WE MOVE THE VARIABLES INTO Y ONCE THEYRE SET UP, NOT JUST MOVING CONSTANTS INTO Y
+	Load_y(100)
+
+	mov x+0, temp_soak
+	mov x+1, #0
+	mov x+2, #0
+	mov x+3, #0
+	lcall mul32 ; Multiplies by 100 so we can compare with FinalTemp properly
+	mov y+0, FinalTemp+0
+	mov y+1, FinalTemp+1 ; Move final temperature measurement into y
+	mov y+2, FinalTemp+2
+	mov y+3, FinalTemp+3
+	lcall x_gteq_y
+	mov temp_gt_150, mf ; If temp_soak >= FinalTemp, = 1
+
+	Load_y(100)
+	mov x+0, temp_refl
+	mov x+1, #0
+	mov x+2, #0
+	mov x+3, #0
+	lcall mul32 ; Multiplies by 100 so we can compare with FinalTemp properly, stores it in x
+	mov y+0, FinalTemp+0
+	mov y+1, FinalTemp+1 ; Move final temperature measurement into y
+	mov y+2, FinalTemp+2
+	mov y+3, FinalTemp+3
+	lcall x_gteq_y
+	mov temp_state1, mf ; If temp_refl >= FinalTemp, = 1
+
+	mov x+0, FinalTemp+0
+	mov x+1, FinalTemp+1 ; Move final temperature measurement into x
+	mov x+2, FinalTemp+2
+	mov x+3, FinalTemp+3
+
+	Load_y(25000) ;if temp greater than 250, temp_gt_250 = 1
+	lcall x_gteq_y
+	mov temp_state3, mf ; Temp > Soak
 
 	Load_y(6000) ;if temp greater than 60, temp_gt_60 = 1
 	lcall x_gteq_y
-	mov temp_gt_60, mf
+	mov temp_state5, mf
 
 	; Convert to BCD and display
 	lcall hex2bcd
 	lcall Display_formated_BCD
-
-
-
-	
-
 	lcall SendBCD
 
 	mov StoreMeasurements+0, #0
