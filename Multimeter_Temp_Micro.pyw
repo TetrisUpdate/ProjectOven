@@ -72,6 +72,7 @@ def update_temp():
           cj=0.0 # If the input is blank, assume cold junction temperature is zero degrees centigrade
 
        strin2 = ser2.readline()
+       ser2.reset_input_buffer() # Fetches latest data
        strin2 = strin2.rstrip()
        strin2 = strin2.decode()
 
@@ -156,7 +157,7 @@ CJTemp.set ("22")
 DMMout.set ("NO DATA")
 DMM_Name.set ("--------")
 
-port = 'COM11' # Change to the serial port assigned to your board
+port = 'COM3' # Change to the serial port assigned to your board
 
 try:
    ser2 = serial.Serial(port, 115200, timeout=0)
