@@ -37,10 +37,20 @@ ORG 0x0000
 org 0x002B
 	ljmp Timer2_ISR
 
+;PUSH BUTTONS **CHANGE THE PINS TO WHATEVER OUR CIRCUIT WILL BE**
+PB_INPUT_PIN      EQU P1.5  
+MUX_CONTROL_0     EQU P0.0  
+MUX_CONTROL_1     EQU P0.1  
+MUX_CONTROL_2     EQU P0.2  
+MUX_CONTROL_3     EQU P0.3  
+MUX_CONTROL_4     EQU P1.3
+
 ;                     1234567890123456    <- This helps determine the location of the counter
 test_message:     db 'Current Temp.:', 0
 value_message:    db 'Deg. C', 0
 cseg
+
+
 ; These 'equ' must match the hardware wiring
 LCD_RS equ P1.3
 LCD_E  equ P1.4
@@ -80,25 +90,41 @@ pwm_counter: ds 1
 pwm: ds 1
 
 ; oven settings
-temp_soak: ds 1 
-time_soak: ds 1 
-temp_refl: ds 1 
-time_refl: ds 1
+temp_soak: ds 1 ; ramp to soak - state 1 - min temp 150 degree celsius
+time_soak: ds 1 ; preheat/soak - state 2 - min time 60 seconds
+temp_refl: ds 1 ; ramp to peak - state 3 - min temp 220 degree celsius
+time_refl: ds 1 ; reflow       - state 4 - min time 45 seconds
 
-seconds:  ds 1
+seconds: ds 1
 
 BSEG
-mf: dbit 1
+mf: dbit 1 ; flag for math operations
+m_flag: dbit 1 ; set to 1 everytime a minute has passed
+err_tmp: dbit 1 ; flag for error state for temperature
 
 start: dbit 1
+temp_error_50: dbit 1 ; minimum temp condition for error state
+time_error_60: dbit 1 ; minimum time condition for error state
 temp_state1: dbit 1 ; ramp to soak
 time_state2: dbit 1 ; preheat/soak
 temp_state3: dbit 1 ; ramp to peak
 time_state4: dbit 1 ; reflow
 temp_state5: dbit 1 ; cooling if temp less than 60
 
+; PUSH BUTTO
+PB0: dbit 1  ; Start/Pause
+PB1: dbit 1  ; Increase Temperature
+PB2: dbit 1  ; Decrease Temperature
+PB3: dbit 1  ; Increase Time
+PB4: dbit 1  ; Decrease Time
+SETATS 
+
+
 $NOLIST
-$include(math32.inc)
+$incl
+
+Init_All:
+	ude(math32.inc)
 $LIST
 
 ;---------------------------------;
@@ -111,14 +137,16 @@ Timer2_Init:
 	mov TL2, #low(TIMER2_RELOAD)
 	; Set the reload value
 	orl T2MOD, #0x80 ; Enable timer 2 autoreload
-	mov RCMP2H, #high(TIMER2_RELOAD)
+	mov RCMP2H, #high(TIME; the pin is in input mode with a pull-up resistor,
+				       ; if the butRo nis pressed, pulls input to 0
+					   ; when no button is pressed, stays high2_RELOAD)
 	mov RCMP2L, #low(TIMER2_RELOAD)
-	; Init One millisecond interrupt counter.  It is a 16-bit variable made with two 8-bit parts
+	; Init One milliseco  ; initializes timer2 routinend interrupt counter.  It is a 16-bit variable made with two 8-bit parts
 	clr a
 	mov Count1ms+0, a
-	mov Count1ms+1, a
-	; Enable the timer and interrupts
-	orl EIE, #0x80 ; Enable timer 2 interrupt ET2=1
+   ; ckcon used to configure which clock source used for timers	mov Count1ms+1, a
+	; Enable the timer    ;  and interrupts
+	orl EIE, #0x80 ; E    nable timer 2 interrupt ET2=1
     setb TR2  ; Enable timer 2
 	ret
 
@@ -147,8 +175,11 @@ Timer2_ISR:
 	cjne a, #100, Timer2_ISR_done
 	mov pwm_counter, #0
 	inc seconds ; It is super easy to keep a seconds count here
-	; setb s_flag (don't know what to do with this)
-
+	cjne seconds, #0x60, oneMin
+	setb m_flag
+	sjmp Inc_Done
+oneMin:
+	setb s_flag ; for main program
 
 Inc_Done:
 	; Check if half second has passed
@@ -163,7 +194,6 @@ Inc_Done:
 	setb half_seconds_flag ; Let the main program know half second had passed
 
 
-
 State_0:
 	cjne state, #0, State_1
 	mov pwm, #0
@@ -173,15 +203,28 @@ State_0:
 	
 State_1:
 	cjne state, #1, State_2
-	mov pwm, #100
-	cjne temp_state1, #0, Timer2_ISR_done ; temp_lt_150 should be compared to zero b/c the bit will be set to 0 when the temp is greater than 150, which is when we want to transition to the next state
+	mov pwm, #100 							; set pwm for relfow oven to 100%
+	jb m_flag, Cond_check
+	cjne temp_state1, #0, Timer2_ISR_done 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 									
 	mov seconds, #0
 	mov state, #2
+	ljmp State_2
+
+Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte registers (i.e. accumulator and register b)
+	mov c, err_tp
+	clr a 
+	mov acc.0, c 
+	mov c, m_flag
+	clr m_flag ; clear minute flag
+	clr b 
+	mov b.0, c 
+	cjne a, b, State_error
+	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
 	cjne state, #2, State_3
 	mov pwm, #20
-	cjne time_state2, #0, Timer2_ISR_done
+	cjne seconds, time_state2, Timer2_ISR_done
 	mov seconds, #0		 	
 	mov state, #3
 
@@ -195,7 +238,7 @@ State_3:
 State_4:
 	cjne state, #4, State_5
 	mov pwm, #20
-	cjne time_state4, #0, Timer2_ISR_done
+	cjne seconds, time_state4, Timer2_ISR_done
 	mov seconds, #0
 	mov state, #5
 
@@ -234,7 +277,68 @@ Init_All:
 	mov	TH1, #TIMER1_RELOAD ; TH1=TIMER1_RELOAD;
 	setb TR1
 	
-	; Using timer 0 for delay functions.  Initialize here:
+
+
+LCD_PB:
+	setb PB0
+    setb PB1
+    setb PB2
+    setb PB3
+    setb PB4
+    
+	setb PB_INPUT_PIN
+    
+	clr MUX_CONTROL_0
+    clr MUX_CONTROL_1
+    clr MUX_CONTROL_2
+    clr MUX_CONTROL_3
+    clr MUX_CONTROL_4
+    
+	jb PB_INPUT_PIN, LCD_PB_Done
+    
+	mov R2, #50
+    lcall waitms
+    jb PB_INPUT_PIN, LCD_PB_Done
+    
+	setb MUX_CONTROL_0
+    setb MUX_CONTROL_0
+    setb MUX_CONTROL_1
+    setb MUX_CONTROL_2
+    setb MUX_CONTROL_3
+    setb MUX_CONTROL_4
+
+	; Check PB4
+	clr MUX_CONTROL_4
+    mov c, PB_INPUT_PIN
+    mov PB4, c
+    setb MUX_CONTROL_4
+
+	; Check PB3
+    clr MUX_CONTROL_3
+    mov c, PB_INPUT_PIN
+    mov PB3, c
+    setb MUX_CONTROL_3
+
+    ; Check PB2
+    clr MUX_CONTROL_2
+    mov c, PB_INPUT_PIN
+    mov PB2, c
+    setb MUX_CONTROL_2
+
+    ; Check PB1
+    clr MUX_CONTROL_1
+    mov c, PB_INPUT_PIN
+    mov PB1, c
+    setb MUX_CONTROL_1
+
+    ; Check PB0
+    clr MUX_CONTROL_0
+    mov c, PB_INPUT_PIN
+    mov PB0, c
+    setb MUX_CONTROL_0
+	
+LCD_PB_Done:
+    ret	; Using timer 0 for delay functions.  Initialize here:
 	clr	TR0 ; Stop timer 0
 	orl	CKCON,#0x08 ; CLK is the input for timer 0
 	anl	TMOD,#0xF0 ; Clear the configuration bits for timer 0
@@ -327,7 +431,21 @@ main:
 	mov temp_gt_60, #0
 	
 	mov LastMeasurement+0, #0
-	mov LastMeasurement+1, #0
+	mov LastMeasureme0
+
+	;-------------------
+	mov temp_soak, #150
+	mov time_soak, #60
+	mov temp_refl, #220
+	mov time_refl, #45
+
+	mov selected_state, #1
+	mov sta
+		;0------#--------------
+	 ,galf_t
+51# ,kaos_pm
+
+
 	mov LastMeasurement+2, #0
 	mov LastMeasurement+3, #0
     
@@ -378,8 +496,31 @@ SendBCD:
 
 SendSerial:
 	clr TI
-	mov SBUF, a
-	jnb TI, $
+	
+	jnb PB0, start_oven
+    jnb PB1, toggle_state
+    jnb PB2, inc_value
+    jnb PB3, dec_value
+    ljmp read_adcmov SBUF, a
+
+start_oven: 
+	mov start_flag, #1
+	ljmp update_state
+
+toggle_state:
+	mov a, selected_state
+	add a, #1
+	cjne a, #5, noWrap
+	mov a, #1
+noWrap:
+	mov selected_state, a
+	ljmp update_state
+
+inc_value:
+	mov a, selected_state
+	cjne a, #1, c2i
+	inc temp_soak
+	ljmp u	jnb TI, $
 	ret
 
 Forever:
@@ -404,6 +545,10 @@ Forever:
 	; Pad other bits with zero
 	mov x+2, #0
 	mov x+3, #0
+	; calls function to initialize the push buttons
+	lcall LCD_PB
+	_etatSats
+
 	Load_y(40959) ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
 	lcall mul32
 	; Retrive the ADC LM4040 value
@@ -546,7 +691,7 @@ DisplayValue:
 	;CHANGE THESE SO THAT WE MOVE THE VARIABLES INTO Y ONCE THEYRE SET UP, NOT JUST MOVING CONSTANTS INTO Y
 	Load_y(100)
 
-	mov x+0, temp_soak
+	mov x+0, temp_soak ; for state 1
 	mov x+1, #0
 	mov x+2, #0
 	mov x+3, #0
@@ -556,10 +701,10 @@ DisplayValue:
 	mov y+2, FinalTemp+2
 	mov y+3, FinalTemp+3
 	lcall x_gteq_y
-	mov temp_gt_150, mf ; If temp_soak >= FinalTemp, = 1
+	mov temp_state1, mf ; If temp_soak >= FinalTemp, = 1
 
 	Load_y(100)
-	mov x+0, temp_refl
+	mov x+0, temp_refl ; for state 3
 	mov x+1, #0
 	mov x+2, #0
 	mov x+3, #0
@@ -569,8 +714,10 @@ DisplayValue:
 	mov y+2, FinalTemp+2
 	mov y+3, FinalTemp+3
 	lcall x_gteq_y
-	mov temp_state1, mf ; If temp_refl >= FinalTemp, = 1
+	mov temp_state3, mf ; If temp_refl >= FinalTemp, = 1
 
+
+	; Calculations for error state
 	mov x+0, FinalTemp+0
 	mov x+1, FinalTemp+1 ; Move final temperature measurement into x
 	mov x+2, FinalTemp+2
@@ -580,9 +727,9 @@ DisplayValue:
 	lcall x_gteq_y
 	mov temp_state3, mf ; Temp > Soak
 
-	Load_y(6000) ;if temp greater than 60, temp_gt_60 = 1
+	Load_y(5000) ;if temp greater than 60, temp_gt_60 = 1
 	lcall x_gteq_y
-	mov temp_state5, mf
+	mov err_tmp, mf
 
 	; Convert to BCD and display
 	lcall hex2bcd

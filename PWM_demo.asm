@@ -143,7 +143,7 @@ main:
 	mov dptr, #line1
 	lcall ?Send_Constant_String
 	Set_Cursor(2, 1)
-	mov dptr, #Line2
+	mov dptr, #line2
 	lcall ?Send_Constant_String
 	
 	mov pwm, #20 ; The pwm in percentage (0 to 100) we want.  Change and check with oscilloscope.
