@@ -100,11 +100,10 @@ seconds: ds 1
 BSEG
 mf: dbit 1 ; flag for math operations
 m_flag: dbit 1 ; set to 1 everytime a minute has passed
-err_tmp: dbit 1 ; flag for error state for temperature
+err_tmp_tm: dbit 1 ; flag for error state for temperature
+err_tmp_150: dbit 1 ; error flag for temp 150 degree celsius
 
 start: dbit 1
-temp_error_50: dbit 1 ; minimum temp condition for error state
-time_error_60: dbit 1 ; minimum time condition for error state
 temp_state1: dbit 1 ; ramp to soak
 time_state2: dbit 1 ; preheat/soak
 temp_state3: dbit 1 ; ramp to peak
@@ -124,7 +123,7 @@ $NOLIST
 $incl
 
 Init_All:
-	ude(math32.inc)
+include(math32.inc)
 $LIST
 
 ;---------------------------------;
@@ -203,49 +202,73 @@ State_0:
 	
 State_1:
 	cjne state, #1, State_2
-	mov pwm, #100 							; set pwm for relfow oven to 100%
+	mov pwm, #100 					; set pwm for relfow oven to 100%
 	jb m_flag, Cond_check
-	cjne temp_state1, #0, Timer2_ISR_done 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 									
+	mov c, temp_state1
+	clr a 							; clear the accumulator
+	mov acc.0, c
+	clr c 							; clear the carry bit
+	cjne a, #0, Timer2_ISR_done 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 									
 	mov seconds, #0
 	mov state, #2
 	ljmp State_2
 
 Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte registers (i.e. accumulator and register b)
-	mov c, err_tp
+	mov c, err_tmp
 	clr a 
-	mov acc.0, c 
+	mov acc.0, c ; mov value in carry to the lowest bit of the accumulator
 	mov c, m_flag
 	clr m_flag ; clear minute flag
 	clr b 
-	mov b.0, c 
+	mov b.0, c ; mov value in carry to the lowest bit of the B regrister
+	clr c
 	cjne a, b, State_error
 	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
 	cjne state, #2, State_3
 	mov pwm, #20
-	cjne seconds, time_state2, Timer2_ISR_done
+	jnb err_tmp_150, State_error
+	mov c, time_state2
+	clr a 							; clear the accumulator
+	mov acc.0, c
+	clr c 							; clear the carry bit
+	cjne a, seconds, Timer2_ISR_done
 	mov seconds, #0		 	
 	mov state, #3
 
 State_3: 
 	cjne state, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
-	cjne temp_state3, #0, Timer2_ISR_done ; 
+	jnb err_tmp_150, State_error
+	mov c, temp_state3
+	clr a 							; clear the accumulator
+	mov acc.0, c
+	clr c 							; clear the carry bit
+	cjne a, #0, Timer2_ISR_done ; 
 	mov seconds, #0
 	mov state, #4
 
 State_4:
 	cjne state, #4, State_5
 	mov pwm, #20
-	cjne seconds, time_state4, Timer2_ISR_done
+	jnb err_tmp_150, State_error
+	mov c, time_state4
+	clr a 							; clear the accumulator
+	mov acc.0, c
+	clr c 							; clear the carry bit
+	cjne a, seconds, Timer2_ISR_done
 	mov seconds, #0
 	mov state, #5
 
 State_5:
 	cjne state, #5, Timer2_ISR_done
 	mov pwm, #0
-	cjne temp_state5, #1, Timer2_ISR_done
+	mov c, temp_state5
+	clr a 							; clear the accumulator
+	mov acc.0, c
+	clr c 							; clear the carry bit
+	cjne a, #1, Timer2_ISR_done
 	mov seconds, #0
 	mov state, #0
 
@@ -412,6 +435,8 @@ main:
 	lcall Init_All
     lcall LCD_4BIT
 
+	clr m_flag ; clear the minute flag in the main code
+
 	mov MeasurementCounter+0, #1
 	mov MeasurementCounter+1, #0
 
@@ -521,7 +546,7 @@ inc_value:
 	cjne a, #1, c2i
 	inc temp_soak
 	ljmp update_state
-	jnb TI, $
+c2i: cjne	jnb TI, $
 	ret
 
 Forever:
@@ -724,9 +749,9 @@ DisplayValue:
 	mov x+2, FinalTemp+2
 	mov x+3, FinalTemp+3
 
-	Load_y(25000) ;if temp greater than 250, temp_gt_250 = 1
+	Load_y(25000) ;if temp greater than 250, err_tmp_150 = 1
 	lcall x_gteq_y
-	mov temp_state3, mf ; Temp > Soak
+	mov err_tmp_150, mf ; for states 2, 3, 4 
 
 	Load_y(5000) ;if temp greater than 60, temp_gt_60 = 1
 	lcall x_gteq_y
