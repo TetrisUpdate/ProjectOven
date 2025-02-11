@@ -174,9 +174,12 @@ Timer2_ISR:
 	cjne a, #100, Timer2_ISR_done
 	mov pwm_counter, #0
 	inc seconds ; It is super easy to keep a seconds count here
+	clr a 
+	mov a, seconds
 	cjne seconds, #0x60, oneMin
 	setb m_flag
-	sjmp Inc_Done
+	mov seconds, #0
+	ljmp Inc_Done
 oneMin:
 	setb s_flag ; for main program
 
@@ -194,21 +197,25 @@ Inc_Done:
 
 
 State_0:
+	mov a, state
 	cjne state, #0, State_1
 	mov pwm, #0
 	cjne start, #1, Timer2_ISR_done
+	clr a
 	mov state, #1
 	ljmp Timer2_ISR_done
 	
 State_1:
-	cjne state, #1, State_2
+	mov a, state
+	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
 	jb m_flag, Cond_check
 	mov c, temp_state1
 	clr a 							; clear the accumulator
 	mov acc.0, c
 	clr c 							; clear the carry bit
-	cjne a, #0, Timer2_ISR_done 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 									
+	cjne a, #0, Timer2_ISR_done 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
+	clr a						
 	mov seconds, #0
 	mov state, #2
 	ljmp State_2
@@ -226,7 +233,8 @@ Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte
 	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
-	cjne state, #2, State_3
+	mov a, state
+	cjne a, #2, State_3
 	mov pwm, #20
 	jnb err_tmp_150, State_error
 	mov c, time_state2
@@ -234,11 +242,13 @@ State_2: ;transition to state three if more than 60 seconds have passed
 	mov acc.0, c
 	clr c 							; clear the carry bit
 	cjne a, seconds, Timer2_ISR_done
+	clr a
 	mov seconds, #0		 	
 	mov state, #3
 
 State_3: 
-	cjne state, #3, State_4 ; check if state = 3, if not, move to state_4
+	mov a, state
+	cjne a, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
 	jnb err_tmp_150, State_error
 	mov c, temp_state3
@@ -246,11 +256,13 @@ State_3:
 	mov acc.0, c
 	clr c 							; clear the carry bit
 	cjne a, #0, Timer2_ISR_done ; 
+	clr a
 	mov seconds, #0
 	mov state, #4
 
 State_4:
-	cjne state, #4, State_5
+	mov a, state
+	cjne a, #4, State_5
 	mov pwm, #20
 	jnb err_tmp_150, State_error
 	mov c, time_state4
@@ -258,22 +270,27 @@ State_4:
 	mov acc.0, c
 	clr c 							; clear the carry bit
 	cjne a, seconds, Timer2_ISR_done
+	clr a
 	mov seconds, #0
 	mov state, #5
 
 State_5:
-	cjne state, #5, Timer2_ISR_done
+	mov a, state
+	cjne a, #5, Timer2_ISR_done
 	mov pwm, #0
 	mov c, temp_state5
 	clr a 							; clear the accumulator
 	mov acc.0, c
 	clr c 							; clear the carry bit
 	cjne a, #1, Timer2_ISR_done
+	clr a
 	mov seconds, #0
 	mov state, #0
 
 State_error:
-	mov state, #0
+	mov a, state
+	mov a, #0
+	; probably should put branch for warning message here
 	
 Timer2_ISR_done:
 	pop psw
@@ -465,10 +482,10 @@ main:
 	mov time_refl, #45
 
 	mov selected_state, #1
-	mov sta
+;	mov sta
 		;0------#--------------
-	 ,galf_t
-51# ,kaos_pm
+;	 ,galf_t
+;    51# ,kaos_pm
 
 
 	mov LastMeasurement+2, #0
@@ -573,7 +590,7 @@ Forever:
 	mov x+3, #0
 	; calls function to initialize the push buttons
 	lcall LCD_PB
-	_etatSats
+	;_etatSats
 
 	Load_y(40959) ; The MEASURED voltage reference: 4.0959V, with 4 decimal places
 	lcall mul32
