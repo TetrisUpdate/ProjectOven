@@ -207,6 +207,7 @@ Inc_Done:
 
 State_0:
     cjne state, #0, State_1
+
     mov pwm, #0
     cjne start, #1, Timer2_ISR_done
     mov state, #1
@@ -582,6 +583,54 @@ main:
     ; Show initial LCD message
     Set_Cursor(1, 1)
     Send_Constant_String(#test_message)
+
+    ljmp Forever
+
+SendBCD:
+
+	mov a, bcd+2
+	anl a, #0x0F ; Isolate ones place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+1
+	anl a, #0xF0 ; Isolate tens place
+	swap a ; Put high nibble into lower nibble
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+1
+	anl a, #0x0F ; Isolate ones place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, #'.'
+	lcall SendSerial
+
+	mov a, bcd+0
+	anl a, #0xF0 ; Isolate 0.1 place
+	swap a ; Put high nibble into lower nibble
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+0
+	anl a, #0x0F ; Isolate 0.01 place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, #'\n'
+	lcall SendSerial
+
+	mov a, #'\r'
+	lcall SendSerial
+
+	ret
+
+SendSerial:
+	clr TI
+	mov SBUF, a
+	jnb TI, $
+	ret
 
 Forever:
     ; Example read reference (AIN0)
