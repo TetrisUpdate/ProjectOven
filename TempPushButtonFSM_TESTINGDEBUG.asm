@@ -203,7 +203,7 @@ State_1:
 ;	clr a 							; clear the accumulator
 ;	mov acc.0, c
 ;	clr c 							; clear the carry bit
-	jb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
+	jnb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
 	clr a						
 	mov seconds, #0
 	mov state, #2
