@@ -128,6 +128,8 @@ temp_state3:   dbit 1
 time_state4:   dbit 1
 temp_state5:   dbit 1
 
+debug_bit:     dbit 1 ;Set to true to check which lines of code actually execute
+
 ; For push buttons
 PB0: dbit 1  ; Start/Pause
 PB1: dbit 1  ; Toggle selected parameter
@@ -198,7 +200,7 @@ State_1:
 	mov a, state
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
-	jb m_flag, Cond_check
+;	jb m_flag, Cond_check
 ;	mov c, temp_state1
 ;	clr a 							; clear the accumulator
 ;	mov acc.0, c
@@ -510,7 +512,7 @@ SendBCD:
     lcall SendSerial
 
     mov a, #0
-    mov c, temp_state1
+    mov c, debug_bit
     mov acc.0, c
     add a, #'0'
     lcall SendSerial
@@ -643,6 +645,7 @@ main:
     mov LastMeasurement+3, #0
     
     clr temp_state1
+    clr debug_bit
 
     ; Show initial LCD message
     Set_Cursor(1, 1)
