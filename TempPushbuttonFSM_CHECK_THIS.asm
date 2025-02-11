@@ -205,7 +205,7 @@ Inc_Done:
     ; Example: Half-second tasks
     ;---------------------------------
     mov a, Count1ms+0
-    cjne a, #low(1000), State_0
+    cjne a, #low(1000), State_0 ; Not needed, the PWM stuff keeps track of seconds, also this is wrong since we have a 10ms interval between timer interrupts now, not 1ms
     mov a, Count1ms+1
     cjne a, #high(1000), State_0
     ; If both match, ~1 second has passed
@@ -217,7 +217,7 @@ State_0:
 	cjne a, #0, State_1
     clr a
 	mov pwm, #0
-	jb start, jumpy
+	jb start, jumpy ; This needs to be moved to before cjne, since otherwise we never go to state 1
 	mov state, #1
 	ljmp Timer2_ISR_done
 	
@@ -517,6 +517,22 @@ SendBCD:
 	add a, #'0' ; Convert value to ASCII
 	lcall SendSerial
 
+    mov a, #' '
+    lcall SendSerial
+
+    mov a, #0
+    mov c, temp_state1
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+    
+    mov a, #' '
+    lcall SendSerial
+    
+    mov a, state
+    add a, #'0'
+    lcall SendSerial
+
 	mov a, #'\n'
 	lcall SendSerial
 
@@ -547,8 +563,8 @@ WaitTx:
 
 ; Start the FSM
 start_oven:
-    setb start                 		; set the flag to 1, indicating that the FSM should begin
-                                    ; return to main or update display as needed
+    ;setb start                 		; set the flag to 1, indicating that the FSM should begin
+    mov state, #1                                ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
 
 ; Toggle which parameter is selected (1..4)
@@ -631,7 +647,7 @@ main:
     clr m_flag
 
     ; Default setpoints
-    mov temp_soak, #150
+    mov temp_soak, #40
     mov time_soak, #60
     mov temp_refl, #220
     mov time_refl, #45
@@ -643,6 +659,8 @@ main:
     mov LastMeasurement+1, #0
     mov LastMeasurement+2, #0
     mov LastMeasurement+3, #0
+    
+    ;clr temp_state1
 
     ; Show initial LCD message
     Set_Cursor(1, 1)
@@ -845,9 +863,6 @@ EndForever:
     ; Always read the push buttons each pass
     lcall LCD_PB
 
-    ; “SendSerial” used as a convenient place to process button logic
-    mov a, #'.'   ; Just some char to send
-    lcall SendSerial
 
     mov x+0, #0
     mov x+1, #0
