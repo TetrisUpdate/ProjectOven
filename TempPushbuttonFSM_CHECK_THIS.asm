@@ -486,6 +486,47 @@ Read_ADC:
 ; New code for push-button-based FSM parameter updates
 ; We intercept button presses in SendSerial
 ;----------------------------------------------------------------------
+SendBCD:
+
+	mov a, bcd+2
+	anl a, #0x0F ; Isolate ones place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+1
+	anl a, #0xF0 ; Isolate tens place
+	swap a ; Put high nibble into lower nibble
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+1
+	anl a, #0x0F ; Isolate ones place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, #'.'
+	lcall SendSerial
+
+	mov a, bcd+0
+	anl a, #0xF0 ; Isolate 0.1 place
+	swap a ; Put high nibble into lower nibble
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, bcd+0
+	anl a, #0x0F ; Isolate 0.01 place
+	add a, #'0' ; Convert value to ASCII
+	lcall SendSerial
+
+	mov a, #'\n'
+	lcall SendSerial
+
+	mov a, #'\r'
+	lcall SendSerial
+
+	ret
+
+
 SendSerial:
     ; Simulate sending 'a' to UART
     clr  TI
@@ -507,7 +548,7 @@ WaitTx:
 
 ; Start the FSM
 start_oven:
-    mov start, #1                   ; set the flag to 1, indicating that the FSM should begin
+    setb start                 		; set the flag to 1, indicating that the FSM should begin
                                     ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
 
@@ -578,8 +619,6 @@ main:
     lcall Init_All
     lcall LCD_4BIT
 
-    clr m_flag
-
     mov MeasurementCounter+0, #1
     mov MeasurementCounter+1, #0
     mov TimePerSample, #1
@@ -589,7 +628,8 @@ main:
 
     ; We start with "state=0" (idle)
     mov state, #0
-    mov start, #0
+    clr start 
+    clr m_flag
 
     ; Default setpoints
     mov temp_soak, #150
