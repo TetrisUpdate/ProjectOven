@@ -217,8 +217,7 @@ State_0:
 	cjne a, #0, State_1
     clr a
 	mov pwm, #0
-    mov a, start
-	cjne a, #1, jumpy
+	jb start, jumpy
 	mov state, #1
 	ljmp Timer2_ISR_done
 	
