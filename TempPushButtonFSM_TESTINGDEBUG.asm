@@ -117,6 +117,7 @@ seconds: ds 1
 BSEG
 mf:            dbit 1
 m_flag:        dbit 1
+s_flag:        dbit 1
 err_tmp:       dbit 1
 err_tmp_150:   dbit 1
 
@@ -164,60 +165,32 @@ Timer2_ISR:
     push psw
 
     ;---------------------------------
-    ; 1ms counter
-    ;---------------------------------
-    inc Count1ms+0
-    mov a, Count1ms+0
-    jnz Inc_Done
-    inc Count1ms+1
-
-    ;---------------------------------
     ; PWM for SSR control
     ;---------------------------------
-    inc pwm_counter
+    inc pwm_counter ;Every 10ms, pwm_counter is incremented
     clr c
     mov a, pwm
-    subb a, pwm_counter ; if pwm_counter <= pwm, c=1
+    subb a, pwm_counter ; if pwm_counter <= pwm, c=1, so if pwm=20 for example, if 210ms has passed, c = 0, and the SSR box is always on
     cpl c
     mov SSR_BOX, c
 
     mov a, pwm_counter
-    cjne a, #100, jumpy1
-    mov pwm_counter, #0
-    inc seconds
+    cjne a, #100, State_0 ; If 1 second has not passed, skip to State_0
+    mov pwm_counter, #0 ; Reset pwm_counter
+    inc seconds ; Increment seconds
     clr a
     mov a, seconds
-    cjne a, #0x60, oneMin
+    cjne a, #60, State_0 ;If exactly 60 seconds has not passed, skip to State_0, otherwise set m_flag to indicate a minute has passed
     setb m_flag
-    ljmp Inc_Done
+    ljmp State_0
 
-jumpy1:
-    ljmp Timer2_ISR_done
-
-oneMin:
-    ; If you also need a second-flag for main, do so here:
-    ; setb s_flag
-    clr a
-    ljmp Inc_Done
-
-Inc_Done:
-    ;---------------------------------
-    ; Example: Half-second tasks
-    ;---------------------------------
-    mov a, Count1ms+0
-    cjne a, #low(1000), State_0 ; Not needed, the PWM stuff keeps track of seconds, also this is wrong since we have a 10ms interval between timer interrupts now, not 1ms
-    mov a, Count1ms+1
-    cjne a, #high(1000), State_0
-    ; If both match, ~1 second has passed
-    ; setb half_seconds_flag
-    ; add any code here if needed
 
 State_0:
     mov a, state
 	cjne a, #0, State_1
     clr a
 	mov pwm, #0
-	jb start, jumpy ; This needs to be moved to before cjne, since otherwise we never go to state 1
+	jnb start, jumpy 
 	mov state, #1
 	ljmp Timer2_ISR_done
 	
@@ -225,12 +198,12 @@ State_1:
 	mov a, state
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
-	;jb m_flag, Cond_check
-	mov c, temp_state1
-	clr a 							; clear the accumulator
-	mov acc.0, c
-	clr c 							; clear the carry bit
-	cjne a, #0, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
+	jb m_flag, Cond_check
+;	mov c, temp_state1
+;	clr a 							; clear the accumulator
+;	mov acc.0, c
+;	clr c 							; clear the carry bit
+	jb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
 	clr a						
 	mov seconds, #0
 	mov state, #2
@@ -533,6 +506,15 @@ SendBCD:
     add a, #'0'
     lcall SendSerial
 
+    mov a, #' '
+    lcall SendSerial
+
+    mov a, #0
+    mov c, temp_state1
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+
 	mov a, #'\n'
 	lcall SendSerial
 
@@ -647,7 +629,7 @@ main:
     clr m_flag
 
     ; Default setpoints
-    mov temp_soak, #40
+    mov temp_soak, #24
     mov time_soak, #60
     mov temp_refl, #220
     mov time_refl, #45
@@ -660,7 +642,7 @@ main:
     mov LastMeasurement+2, #0
     mov LastMeasurement+3, #0
     
-  ;  setb temp_state1
+    clr temp_state1
 
     ; Show initial LCD message
     Set_Cursor(1, 1)
@@ -800,6 +782,7 @@ DisplayValue:
     ; --------------------------------------------------------
     ; Compare final temperature with soak/reflow setpoints
     ; --------------------------------------------------------
+    clr mf
     Load_y(100)
     mov x+0, temp_soak
     mov x+1, #0
@@ -810,9 +793,11 @@ DisplayValue:
     mov y+1, FinalTemp+1
     mov y+2, FinalTemp+2
     mov y+3, FinalTemp+3
-    lcall x_gteq_y
-    mov temp_state1, mf
+    lcall x_gteq_y ; mf = 1 if temp_soak>=FinalTemp
+    mov c, mf
+    mov temp_state1, c
 
+    clr mf
     Load_y(100)
     mov x+0, temp_refl
     mov x+1, #0
@@ -824,7 +809,8 @@ DisplayValue:
     mov y+2, FinalTemp+2
     mov y+3, FinalTemp+3
     lcall x_gteq_y
-    mov temp_state3, mf
+    mov c, mf
+    mov temp_state3, c
 
     ; Check error states
     mov x+0, FinalTemp+0
@@ -832,13 +818,20 @@ DisplayValue:
     mov x+2, FinalTemp+2
     mov x+3, FinalTemp+3
 
+    clr mf
     Load_y(25000)
     lcall x_gteq_y
-    mov err_tmp_150, mf
+    mov c, mf
+    mov err_tmp_150, c
 
+    clr mf
     Load_y(5000)
     lcall x_gteq_y
-    mov err_tmp, mf
+    mov c, mf
+    mov err_tmp, c
+
+
+
 
     ; Convert FinalTemp => BCD => display
     lcall hex2bcd
