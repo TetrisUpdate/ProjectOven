@@ -536,7 +536,7 @@ SendBCD:
     add a, #'0'
     lcall SendSerial
 
-        mov a, #' '
+    mov a, #' '
     lcall SendSerial
 
     mov a, #0
@@ -544,6 +544,28 @@ SendBCD:
     mov acc.0, c
     add a, #'0'
     lcall SendSerial
+
+    mov a, #' '
+    lcall SendSerial
+    mov a, #' '
+    lcall SendSerial
+
+    mov a, #0
+    mov c, kill_flag
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+
+    mov a, #' '
+    lcall SendSerial
+
+    mov a, #0
+    mov c, start
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+
+
 
 	mov a, #'\n'
 	lcall SendSerial
