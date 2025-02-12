@@ -575,11 +575,16 @@ WaitTx:
 
 ; Start the FSM
 start_oven:
-    mov acc.0, start
+	clr c
+    mov c, start
+    clr a
+    mov acc.0, c
     cpl a                 		; set the flag to 1, indicating that the FSM should begin
     mov start, acc.0
     clr a
-    mov acc.0, kill_flag
+    clr c
+    mov c, kill_flag
+    mov acc.0, c
     cpl a                    ; compliment kill 
     mov kill_flag, acc.0
     
