@@ -70,6 +70,15 @@ SSR_BOX equ P0.4
 test_message:     db 'Current Temp.:', 0
 value_message:    db 'Deg. C', 0
 
+temp_soak_string: db 'Temp Soak: ', 0
+time_soak_string: db 'Time Soak: ', 0
+temp_refl_string: db 'Time Reflow: ', 0
+time_refl_string: db 'Time Reflow: ', 0
+
+degree_label: db ' C', 0
+seconds_label: db ' s', 0
+
+
 cseg
 
 $NOLIST
@@ -200,7 +209,7 @@ State_0:
 	ljmp Timer2_ISR_done
 	
 State_1:
-    jb kill_flag, State_0
+    jb kill_flag, jumpyError
 	mov a, state
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
@@ -229,7 +238,7 @@ Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte
 	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
-    jb kill_flag, State_0
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #2, State_3
 	mov pwm, #20
@@ -244,9 +253,11 @@ State_2: ;transition to state three if more than 60 seconds have passed
 
 jumpy:
     ljmp Timer2_ISR_done
+jumpyError:
+    ljmp State_error
 
 State_3: 
-    jb kill_flag, State_0
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
@@ -285,11 +296,13 @@ State_5:
     jnb temp_state5, Timer2_ISR_done
 	mov state, #0
     mov state_sec, #0
+    
     ljmp Timer2_ISR_done
 
 State_error:
 	mov a, #0
 	mov state, a
+    ljmp Timer2_ISR_done
 	; probably should put branch for warning message here
 
 Timer2_ISR_done:
@@ -380,10 +393,8 @@ LCD_PB:
     ; Debouncing
     ;---------------------------------
     jb  PB_INPUT_PIN, LCD_PB_Done 
-    mov R2, #50
+    mov R2, #30
     lcall waitms
-    
-    jb  PB_INPUT_PIN, LCD_PB_Done
 
     ; Now set all MUX lines = 1 to read them individually
     setb MUX_CONTROL_0
