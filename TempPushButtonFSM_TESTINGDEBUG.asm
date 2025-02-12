@@ -575,8 +575,14 @@ WaitTx:
 
 ; Start the FSM
 start_oven:
-    cpl start                 		; set the flag to 1, indicating that the FSM should begin
-    cpl kill_flag                    ; compliment kill 
+    mov acc.0, start
+    cpl a                 		; set the flag to 1, indicating that the FSM should begin
+    mov start, acc.0
+    clr a
+    mov acc.0, kill_flag
+    cpl a                    ; compliment kill 
+    mov kill_flag, acc.0
+    
     ;mov start, # 1                                ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
 
