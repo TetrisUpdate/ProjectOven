@@ -204,9 +204,9 @@ State_0:
     clr a
     mov state_sec, #0
 	mov pwm, #0
-	jnb start, jumpy 
+	jnb start, Display_1 
 	mov state, #1
-	ljmp Timer2_ISR_done
+	ljmp Display_1
 	
 State_1:
     jb kill_flag, jumpyError
@@ -214,11 +214,7 @@ State_1:
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
     mov state_sec, #0
-;	jb m_flag, Cond_check
-;	mov c, temp_state1
-;	clr a 							; clear the accumulator
-;	mov acc.0, c
-;	clr c 							; clear the carry bit
+	jb m_flag, Cond_check
 	jnb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
 	clr a						
 	mov state, #2
@@ -318,6 +314,21 @@ State_error:
 	mov state, a
     ljmp Timer2_ISR_done
 	; probably should put branch for warning message here
+
+; Second FSM for displaying values for each state
+Display_0: ; Diisplays when in state 0 - Waiting
+
+Display_1: ; Displays state 1 - Soak Temp.
+    ; Do something 
+    ljmp 
+
+Display_2: ; Displays state
+Display_3:
+Display_4:
+Display_Error:
+
+
+
 
 Timer2_ISR_done:
     pop psw
