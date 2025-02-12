@@ -32,7 +32,7 @@ BAUD              EQU 115200   ; Baud rate of UART in bps
 TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 
 TIMER2_RATE       EQU 100      ; 100 Hz -> 10ms tick
-TIMER2_RELOAD     EQU ((65536-(CLK/TIMER2_RATE)))
+TIMER2_RELOAD     EQU ((65536-(CLK/(16*TIMER2_RATE))))
 
 SAMPLES_PER_DISPLAY  EQU 300
 REFRESHES_PER_SECOND EQU 45
@@ -51,11 +51,11 @@ org 0x002B
 
 ; PUSH BUTTONS (single-pin read approach)
 PB_INPUT_PIN   EQU P1.5  ; The single pin used to read all 5 PBs
-MUX_CONTROL_0  EQU P0.0  
-MUX_CONTROL_1  EQU P0.1  
-MUX_CONTROL_2  EQU P0.2  
-MUX_CONTROL_3  EQU P0.3  
-MUX_CONTROL_4  EQU P1.3  
+MUX_CONTROL_0  EQU P1.3  
+MUX_CONTROL_1  EQU P0.0  
+MUX_CONTROL_2  EQU P0.1  
+MUX_CONTROL_3  EQU P0.2  
+MUX_CONTROL_4  EQU P0.3  
 
 ; LCD assignments
 LCD_RS  equ P1.3
@@ -110,6 +110,7 @@ temp_refl: ds 1  ; For state 3
 time_refl: ds 1  ; For state 4
 
 seconds: ds 1
+state_sec: ds 1
 
 ;----------------------------------------------------------------------
 ; Bit variables (BSEG)
@@ -123,9 +124,7 @@ err_tmp_150:   dbit 1
 
 start:         dbit 1  ; Start the FSM
 temp_state1:   dbit 1
-time_state2:   dbit 1
 temp_state3:   dbit 1
-time_state4:   dbit 1
 temp_state5:   dbit 1
 
 debug_bit:     dbit 1 ;Set to true to check which lines of code actually execute
@@ -151,7 +150,7 @@ Timer2_Init:
     mov T2CON, #0       ; Stop timer, mode = auto-reload
     mov TH2, #high(TIMER2_RELOAD)
     mov TL2, #low(TIMER2_RELOAD)
-    orl T2MOD, #0x80    ; Enable auto-reload
+    orl T2MOD, #0b1010_0000    ; Enable auto-reload
     mov RCMP2H, #high(TIMER2_RELOAD)
     mov RCMP2L, #low(TIMER2_RELOAD)
     clr  a
@@ -180,6 +179,7 @@ Timer2_ISR:
     cjne a, #100, State_0 ; If 1 second has not passed, skip to State_0
     mov pwm_counter, #0 ; Reset pwm_counter
     inc seconds ; Increment seconds
+    inc state_sec ; Will only increment in states 2 and 4, gets reset to 0 in all other states otherrwise
     clr a
     mov a, seconds
     cjne a, #60, State_0 ;If exactly 60 seconds has not passed, skip to State_0, otherwise set m_flag to indicate a minute has passed
@@ -191,6 +191,7 @@ State_0:
     mov a, state
 	cjne a, #0, State_1
     clr a
+    mov state_sec, #0
 	mov pwm, #0
 	jnb start, jumpy 
 	mov state, #1
@@ -200,15 +201,16 @@ State_1:
 	mov a, state
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
+    mov state_sec, #0
 ;	jb m_flag, Cond_check
 ;	mov c, temp_state1
 ;	clr a 							; clear the accumulator
 ;	mov acc.0, c
 ;	clr c 							; clear the carry bit
-	jb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
+	jnb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
 	clr a						
-	mov seconds, #0
 	mov state, #2
+    mov state_sec, #0
 	ljmp State_2
 
 Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte registers (i.e. accumulator and register b)
@@ -227,16 +229,14 @@ State_2: ;transition to state three if more than 60 seconds have passed
 	mov a, state
 	cjne a, #2, State_3
 	mov pwm, #20
-	jnb err_tmp_150, State_error
-	mov c, time_state2
-	clr a 							; clear the accumulator
-	mov acc.0, c
-	clr c 							; clear the carry bit
-	cjne a, seconds, jumpy
-	clr a
-	mov seconds, #0		 	
+	jb err_tmp_150, State_error
+    clr a 	
+    mov a, state_sec
+    clr c
+    subb a, time_soak ; If state_sec - time_soak is negative (so not enough time has passed), then c = 1, 
+    jc Timer2_ISR_done
 	mov state, #3
-    ljmp State_3
+    mov state_sec, #0
 
 jumpy:
     ljmp Timer2_ISR_done
@@ -245,46 +245,44 @@ State_3:
 	mov a, state
 	cjne a, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
-	jnb err_tmp_150, State_error
-	mov c, temp_state3
-	clr a 							; clear the accumulator
-	mov acc.0, c
-	clr c 							; clear the carry bit
-	cjne a, #0, Timer2_ISR_done ; 
+    mov state_sec, #0
+	jb err_tmp_150, State_error
+	;mov c, temp_state3
+	;clr a 							; clear the accumulator
+	;mov acc.0, c
+	;clr c 							; clear the carry bit
+	;cjne a, #0, Timer2_ISR_done ;
+    jnb temp_state3, Timer2_ISR_done
 	clr a
-	mov seconds, #0
+    mov state_sec, #0
 	mov state, #4
 
 State_4:
 	mov a, state
 	cjne a, #4, State_5
 	mov pwm, #20
-	jnb err_tmp_150, State_error
-	mov c, time_state4
-	clr a 							; clear the accumulator
-	mov acc.0, c
-	clr c 							; clear the carry bit
-	cjne a, seconds, Timer2_ISR_done
-	clr a
-	mov seconds, #0
+	jb err_tmp_150, State_error
+    clr a
+    mov a, state_sec
+    subb a, time_refl
+    jc Timer2_ISR_Done    
 	mov state, #5
+    mov state_sec, #0
 
 State_5:
 	mov a, state
 	cjne a, #5, Timer2_ISR_done
 	mov pwm, #0
-	mov c, temp_state5
-	clr a 							; clear the accumulator
-	mov acc.0, c
-	clr c 							; clear the carry bit
-	cjne a, #1, Timer2_ISR_done
-	clr a
-	mov seconds, #0
+    mov state_sec, #0
+    jb err_tmp_150, State_error
+    jnb temp_state5, Timer2_ISR_done
 	mov state, #0
+    mov state_sec, #0
+    ljmp Timer2_ISR_done
 
 State_error:
-	mov a, state
 	mov a, #0
+	mov state, a
 	; probably should put branch for warning message here
 
 Timer2_ISR_done:
@@ -517,6 +515,29 @@ SendBCD:
     add a, #'0'
     lcall SendSerial
 
+    mov a, #' '
+    lcall SendSerial
+    
+    mov a, state_sec
+    add a, #'0'
+    lcall SendSerial
+
+    mov a, #' '
+    lcall SendSerial
+    
+    mov a, seconds
+    add a, #'0'
+    lcall SendSerial
+
+        mov a, #' '
+    lcall SendSerial
+
+    mov a, #0
+    mov c, SSR_BOX
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+
 	mov a, #'\n'
 	lcall SendSerial
 
@@ -547,8 +568,8 @@ WaitTx:
 
 ; Start the FSM
 start_oven:
-    ;setb start                 		; set the flag to 1, indicating that the FSM should begin
-    mov state, #1                                ; return to main or update display as needed
+    setb start                 		; set the flag to 1, indicating that the FSM should begin
+    ;mov start, # 1                                ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
 
 ; Toggle which parameter is selected (1..4)
@@ -617,6 +638,8 @@ main:
     mov sp, #0x7F
     lcall Init_All
     lcall LCD_4BIT
+    lcall Timer2_Init ; initialize interupts 
+    setb EA
 
     mov MeasurementCounter+0, #1
     mov MeasurementCounter+1, #0
@@ -631,10 +654,10 @@ main:
     clr m_flag
 
     ; Default setpoints
-    mov temp_soak, #24
-    mov time_soak, #60
-    mov temp_refl, #220
-    mov time_refl, #45
+    mov temp_soak, #28
+    mov time_soak, #5
+    mov temp_refl, #30
+    mov time_refl, #5
 
     ; Which parameter we are currently adjusting: 1=temp_soak,2=time_soak,3=temp_refl,4=time_refl
     mov selected_state, #1
@@ -645,7 +668,14 @@ main:
     mov LastMeasurement+3, #0
     
     clr temp_state1
+    clr temp_state3
     clr debug_bit
+    clr err_tmp
+    clr err_tmp_150
+    mov seconds, #0
+    mov state_sec, #0
+    mov pwm_counter, #0
+    mov pwm, #0
 
     ; Show initial LCD message
     Set_Cursor(1, 1)
@@ -796,7 +826,7 @@ DisplayValue:
     mov y+1, FinalTemp+1
     mov y+2, FinalTemp+2
     mov y+3, FinalTemp+3
-    lcall x_gteq_y ; mf = 1 if temp_soak>=FinalTemp
+    lcall x_lteq_y ; mf = 1 if temp_soak<=FinalTemp
     mov c, mf
     mov temp_state1, c
 
@@ -811,7 +841,7 @@ DisplayValue:
     mov y+1, FinalTemp+1
     mov y+2, FinalTemp+2
     mov y+3, FinalTemp+3
-    lcall x_gteq_y
+    lcall x_lteq_y ; mf = 1 if temp_refl<=FinalTemp
     mov c, mf
     mov temp_state3, c
 
@@ -823,16 +853,21 @@ DisplayValue:
 
     clr mf
     Load_y(25000)
-    lcall x_gteq_y
+    lcall x_gteq_y ; mf = 1 if FinalTemp<=250
     mov c, mf
     mov err_tmp_150, c
 
     clr mf
     Load_y(5000)
-    lcall x_gteq_y
+    lcall x_gteq_y ; mf = 1 if FinalTemp>=50
     mov c, mf
     mov err_tmp, c
 
+    clr mf
+    Load_y(3000)
+    lcall x_lteq_y ; mf = 1 if FinalTemp<=60
+    mov c, mf
+    mov temp_state5, c
 
 
 
