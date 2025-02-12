@@ -234,11 +234,11 @@ Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte
 	mov b, #00h 
 	mov b.0, c ; mov value in carry to the lowest bit of the B regrister
 	clr c
-	cjne a, b, State_error
+	cjne a, b, jumpyError
 	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
-    jb kill_flag, State_error
+    jb kill_flag, jumpyError
 	mov a, state
 	cjne a, #2, State_3
 	mov pwm, #20
