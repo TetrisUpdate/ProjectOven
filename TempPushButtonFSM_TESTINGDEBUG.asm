@@ -580,13 +580,13 @@ start_oven:
     clr a
     mov acc.0, c
     cpl a                 		; set the flag to 1, indicating that the FSM should begin
-    mov start, acc.0
+    mov start, a
     clr a
     clr c
     mov c, kill_flag
     mov acc.0, c
     cpl a                    ; compliment kill 
-    mov kill_flag, acc.0
+    mov kill_flag, a
     
     ;mov start, # 1                                ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
