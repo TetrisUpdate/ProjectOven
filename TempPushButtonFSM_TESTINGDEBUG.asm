@@ -316,17 +316,27 @@ State_error:
 	; probably should put branch for warning message here
 
 ; Second FSM for displaying values for each state
-Display_0: ; Diisplays when in state 0 - Waiting
+
+Display_0: ; Displays state 0 - Oven On
+    mov a, selected_state
+    cjne a, #0, Display_1
 
 Display_1: ; Displays state 1 - Soak Temp.
-    ; Do something 
-    ljmp 
+    mov a, selected_state
+    cjne a, #1, Display_2
 
-Display_2: ; Displays state
-Display_3:
-Display_4:
-Display_Error:
 
+Display_2: ; Displays state 2 - Soak Time
+    mov a, selected_state
+    cjne a, #2, Display_3
+
+Display_3: ; Displays state 3 - Reflow Temp.
+    mov a, selected_state
+    cjne a, #3, Display_4
+
+Display_4: ; Displays state 4 - Reflow Time
+    mov a, selected_state
+    cjne a, #4, Timer2_ISR_done
 
 
 
