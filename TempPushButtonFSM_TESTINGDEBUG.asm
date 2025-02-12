@@ -129,6 +129,8 @@ temp_state5:   dbit 1
 
 debug_bit:     dbit 1 ;Set to true to check which lines of code actually execute
 
+kill_flag:      dbit 1 ; kill switch
+
 ; For push buttons
 PB0: dbit 1  ; Start/Pause
 PB1: dbit 1  ; Toggle selected parameter
@@ -198,6 +200,7 @@ State_0:
 	ljmp Timer2_ISR_done
 	
 State_1:
+    jb kill_flag, State_0
 	mov a, state
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
@@ -226,6 +229,7 @@ Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte
 	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
+    jb kill_flag, State_0
 	mov a, state
 	cjne a, #2, State_3
 	mov pwm, #20
@@ -242,6 +246,7 @@ jumpy:
     ljmp Timer2_ISR_done
 
 State_3: 
+    jb kill_flag, State_0
 	mov a, state
 	cjne a, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
@@ -258,6 +263,7 @@ State_3:
 	mov state, #4
 
 State_4:
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #4, State_5
 	mov pwm, #20
@@ -270,6 +276,7 @@ State_4:
     mov state_sec, #0
 
 State_5:
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #5, Timer2_ISR_done
 	mov pwm, #0
@@ -568,7 +575,8 @@ WaitTx:
 
 ; Start the FSM
 start_oven:
-    setb start                 		; set the flag to 1, indicating that the FSM should begin
+    cpl start                 		; set the flag to 1, indicating that the FSM should begin
+    cpl kill_flag                    ; compliment kill 
     ;mov start, # 1                                ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
 
@@ -650,8 +658,9 @@ main:
 
     ; We start with "state=0" (idle)
     mov state, #0
-    clr start 
+    clr start ; compliment in start_oven
     clr m_flag
+    setb kill_flag
 
     ; Default setpoints
     mov temp_soak, #28
