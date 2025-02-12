@@ -200,7 +200,7 @@ State_0:
 	ljmp Timer2_ISR_done
 	
 State_1:
-    jb kill_flag, State_0
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #1, State_2
 	mov pwm, #100 					; set pwm for relfow oven to 100%
@@ -229,7 +229,7 @@ Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte
 	ljmp State_1
 
 State_2: ;transition to state three if more than 60 seconds have passed
-    jb kill_flag, State_0
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #2, State_3
 	mov pwm, #20
@@ -246,7 +246,7 @@ jumpy:
     ljmp Timer2_ISR_done
 
 State_3: 
-    jb kill_flag, State_0
+    jb kill_flag, State_error
 	mov a, state
 	cjne a, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
@@ -281,6 +281,20 @@ State_5:
 	cjne a, #5, Timer2_ISR_done
 	mov pwm, #0
     mov state_sec, #0
+    clr c
+    mov c, start
+    clr a
+    mov acc.0, c
+    cpl a                 		; set the flag to 1, indicating that the FSM should begin
+    mov c, acc.0
+    mov start, c
+    clr a
+    clr c
+    mov c, kill_flag
+    mov acc.0, c
+    cpl a                    ; compliment kill
+    mov c, acc.0 
+    mov kill_flag, c
     jb err_tmp_150, State_error
     jnb temp_state5, Timer2_ISR_done
 	mov state, #0
@@ -611,7 +625,6 @@ start_oven:
     cpl a                    ; compliment kill
     mov c, acc.0 
     mov kill_flag, c
-    
     ;mov start, # 1                                ; return to main or update display as needed
     ljmp end_button_logic           ; jump to exit logic
 
