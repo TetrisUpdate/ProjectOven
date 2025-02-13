@@ -74,7 +74,7 @@ ax.grid()
 xdata, ydata = [], []
 ax.set_xlabel("Time (s)", fontsize=14)
 ax.set_ylabel("Temperature (°C)", fontsize=14)
-ax.set_title("LM335 Temperature Strip-Chart", fontsize=22)
+ax.set_title("Temperature Strip-Chart", fontsize=22)
 max_text = ax.text(1.0025,0.6,"Error: Reconnect", transform=ax.transAxes, fontsize=11, color = 'red') #Add text for max/min/current temp
 min_text = ax.text(1.0025,0.4,"Error: Reconnect", transform=ax.transAxes, fontsize=11, color = 'blue')
 current_text = ax.text(1.0025,0.5,"Error: Reconnect", transform=ax.transAxes, fontsize=14)
