@@ -25,7 +25,7 @@ BAUD              EQU 115200 ; Baud rate of UART in bps
 TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
 
-SAMPLES_PER_DISPLAY equ 300 
+SAMPLES_PER_DISPLAY equ 10
 REFRESHES_PER_SECOND equ 45 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
 TIMER0_DENOM equ (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
 

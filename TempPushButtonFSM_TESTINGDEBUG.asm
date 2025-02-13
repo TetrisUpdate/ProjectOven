@@ -34,10 +34,11 @@ TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 TIMER2_RATE       EQU 100      ; 100 Hz -> 10ms tick
 TIMER2_RELOAD     EQU ((65536-(CLK/(16*TIMER2_RATE))))
 
-SAMPLES_PER_DISPLAY  EQU 300
-REFRESHES_PER_SECOND EQU 45
-TIMER0_DENOM         EQU (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
-TIMER0_RELOAD        EQU (0x10000-(CLK/TIMER0_DENOM))
+TIMER0_RATE          EQU 2250
+TIMER0_RELOAD        EQU (0x10000-(CLK/TIMER0_RATE))
+
+SAMPLES_PER_DISPLAY EQU 150
+REFRESHES_PER_SECOND EQU 15
 
 ORG 0x0000
     ljmp main
@@ -46,6 +47,7 @@ ORG 0x0000
 org 0x000B
 	ljmp Timer0_ISR
 
+; Timer/Counter 2 overflow interrupt vector
 org 0x002B
     ljmp Timer2_ISR
 
@@ -60,6 +62,7 @@ MUX_CONTROL_1  EQU P0.0
 MUX_CONTROL_2  EQU P0.1  
 MUX_CONTROL_3  EQU P0.2  
 MUX_CONTROL_4  EQU P0.3  
+SOUND_OUT      EQU P3.0
 
 ; LCD assignments
 LCD_RS  equ P1.3
@@ -152,7 +155,7 @@ temp_state3:   dbit 1
 temp_state5:   dbit 1
 
 debug_bit:     dbit 1 ;Set to true to check which lines of code actually execute
-
+debug_bit1:    dbit 1
 kill_flag:      dbit 1 ; kill switch
 
 ; For push buttons
@@ -168,7 +171,7 @@ PB2_db: dbit 1
 PB3_db: dbit 1
 PB4_db: dbit 1
 
-
+sound_flag: dbit 1
 
 ;SETATS
 
@@ -182,11 +185,25 @@ $LIST
 ;----------------------------------------------------------------------
 
 
-Timer0_Init:
+
 
 
 
 Timer0_ISR:
+	;clr TF0  ; According to the data sheet this is done for us already.
+	; Timer 0 doesn't have 16-bit auto-reload, so
+	clr TR0
+	mov TH0, #high(TIMER0_RELOAD) ;TH0 and TL0 are only 8 bits, so we need to load each half individually
+	mov TL0, #low(TIMER0_RELOAD) ; For 0xF830 for example, #high gives 0xF8, #low gives #0x30
+	setb TR0 ; Start timer 0
+	jb sound_flag, Timer0_ISR_Sound
+	clr SOUND_OUT
+	sjmp Timer0_ISR_Done
+Timer0_ISR_Sound:
+	cpl SOUND_OUT
+	sjmp Timer0_ISR_Done
+Timer0_ISR_Done:
+	reti
 
 
 Timer2_Init:
@@ -219,7 +236,7 @@ Timer2_ISR:
     clr c
     mov a, pwm
     subb a, pwm_counter ; if pwm_counter <= pwm, c=1, so if pwm=20 for example, if 210ms has passed, c = 0, and the SSR box is always on
-    cpl c
+    ;cpl c
     mov SSR_BOX, c
     
 CheckButton0:
@@ -272,9 +289,17 @@ CheckPWM:
     mov a, pwm_counter
     cjne a, #100, State_0 ; If 1 second has not passed, skip to State_0
     mov pwm_counter, #0 ; Reset pwm_counter
+    mov a, state
+    cjne a, #0, SecondsLogic
+    ljmp State_0
+
+
+SecondsLogic:
     inc seconds ; Increment seconds
     inc state_sec ; Will only increment in states 2 and 4, gets reset to 0 in all other states otherrwise
     clr a
+    mov a, state
+    cjne a, #1, State_0
     mov a, seconds
     cjne a, #60, State_0 ;If exactly 60 seconds has not passed, skip to State_0, otherwise set m_flag to indicate a minute has passed
     setb m_flag
@@ -283,7 +308,7 @@ CheckPWM:
 
 State_0:
     mov a, state
-	cjne a, #0, jumpy
+	cjne a, #0, State_1
     clr a
     mov state_sec, #0
 	mov pwm, #0
@@ -295,9 +320,10 @@ State_1:
     jb kill_flag, jumpyError
 	mov a, state
 	cjne a, #1, State_2
+	mov state_sec, #0
 	mov pwm, #100 					; set pwm for relfow oven to 100%
-    mov state_sec, #0
 	jb m_flag, Cond_check
+    setb debug_bit1
 	jnb temp_state1, jumpy 	; mf = 1 if oven temp <= set temp, jump out of ISR. mf = 0 if oven temp > set temp, thus move onto next state 			
 	clr a						
 	mov state, #2
@@ -305,23 +331,17 @@ State_1:
 	ljmp State_2
 
 Cond_check: ; cjne is not bit-addressable, therefore we must move bits into byte registers (i.e. accumulator and register b)
-	mov c, err_tmp
-	clr a 
-	mov acc.0, c ; mov value in carry to the lowest bit of the accumulator
-	mov c, m_flag
-	clr m_flag ; clear minute flag
-	mov b, #00h 
-	mov b.0, c ; mov value in carry to the lowest bit of the B regrister
-	clr c
-	cjne a, b, jumpyError
-	ljmp State_1
+	setb debug_bit
+    jnb err_tmp, jumpyErrorKill
+	ljmp jumpy
+
 
 State_2: ;transition to state three if more than 60 seconds have passed
     jb kill_flag, jumpyError
 	mov a, state
 	cjne a, #2, State_3
 	mov pwm, #20
-	jb err_tmp_150, State_error
+	jb err_tmp_150, jumpyErrorKill
     clr a 	
 
     
@@ -336,6 +356,9 @@ jumpy:
     ljmp Display_0
 jumpyError:
     ljmp State_error
+jumpyErrorkill:
+    ljmp State_error_kill
+
 
 State_3: 
     jb kill_flag, State_error
@@ -343,7 +366,7 @@ State_3:
 	cjne a, #3, State_4 ; check if state = 3, if not, move to state_4
 	mov pwm, #100 ; set pwm to 100%
     mov state_sec, #0
-	jb err_tmp_150, State_error
+	jb err_tmp_150, State_error_kill
 	;mov c, temp_state3
 	;clr a 							; clear the accumulator
 	;mov acc.0, c
@@ -359,7 +382,7 @@ State_4:
 	mov a, state
 	cjne a, #4, State_5
 	mov pwm, #20
-	jb err_tmp_150, State_error
+	jb err_tmp_150, State_error_kill
     clr a
     mov a, state_sec
     subb a, time_refl
@@ -373,6 +396,24 @@ State_5:
 	cjne a, #5, jumpy
 	mov pwm, #0
     mov state_sec, #0
+    jb err_tmp_150, State_error_kill
+    jnb temp_state5, jumpy
+	mov state, #0
+    mov state_sec, #0
+    sjmp State_end
+
+
+State_error_kill:
+	mov a, #0
+	mov state, a
+    sjmp State_end
+    
+State_error:
+	mov a, #0
+	mov state, a
+    sjmp Display_0
+
+State_end:
     clr c
     mov c, start
     clr a
@@ -387,17 +428,10 @@ State_5:
     cpl a                    ; compliment kill
     mov c, acc.0 
     mov kill_flag, c
-    jb err_tmp_150, State_error
-    jnb temp_state5, jumpy
-	mov state, #0
-    mov state_sec, #0
-    
-    ljmp jumpy
+    clr m_flag
+    mov seconds, #0
+    sjmp Display_0
 
-State_error:
-	mov a, #0
-	mov state, a
-    ljmp jumpy
 	; probably should put branch for warning message here
 
 ; Second FSM for displaying values for each state
@@ -517,6 +551,10 @@ Init_All:
     orl CKCON, #0x08
     anl TMOD,  #0xF0
     orl TMOD,  #0x01      ; 16-bit mode
+    mov TH0, #high(TIMER0_RELOAD)
+    mov TL0, #low(TIMER0_RELOAD)
+    setb ET0 ; Enable timer 0  interrupt
+    setb TR0 ; Start timer 0
     ; ADC pins: P1.1 (AIN7), P1.7 (AIN0)
     orl P1M1, #0b10000010 ; Set P1.1 & P1.7 as input
     anl P1M2, #0b01111101
@@ -618,14 +656,14 @@ LCD_PB_Done:
 ; Display_formated_BCD: Display the result with decimal
 ;----------------------------------------------------------------------
 Display_formated_BCD:
-    Set_Cursor(2, 1)
+    Set_Cursor(2, 8)
     Display_BCD(bcd+2)
     Display_BCD(bcd+1)
     Display_char(#'.')
     Display_BCD(bcd+0)
     Display_char(#0xDF)    ; Degree symbol
     Display_char(#'C')
-    Set_Cursor(2,1)
+    Set_Cursor(2,8)
     Display_char(#' ')
     ret
 
@@ -705,8 +743,17 @@ SendBCD:
     mov a, #' '
     lcall SendSerial
 
+    mov a, #'d'
+    lcall SendSerial
+
     mov a, #0
     mov c, debug_bit
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+
+    mov a, #0
+    mov c, debug_bit1
     mov acc.0, c
     add a, #'0'
     lcall SendSerial
@@ -721,6 +768,8 @@ SendBCD:
     mov a, #' '
     lcall SendSerial
     
+    mov a, #'*'
+    lcall SendSerial
     mov a, seconds
     add a, #'0'
     lcall SendSerial
@@ -729,7 +778,7 @@ SendBCD:
     lcall SendSerial
 
     mov a, #0
-    mov c, SSR_BOX
+    mov c, m_flag
     mov acc.0, c
     add a, #'0'
     lcall SendSerial
@@ -750,6 +799,18 @@ SendBCD:
 
     mov a, #0
     mov c, start
+    mov acc.0, c
+    add a, #'0'
+    lcall SendSerial
+    
+    mov a, #' '
+    lcall SendSerial
+    
+    mov a, #'p'
+    lcall SendSerial
+
+    mov a, #0
+    mov c, SSR_BOX
     mov acc.0, c
     add a, #'0'
     lcall SendSerial
@@ -876,9 +937,11 @@ main:
     lcall Timer2_Init ; initialize interupts 
     setb EA
 
+    clr SSR_BOX
+
     mov MeasurementCounter+0, #1
     mov MeasurementCounter+1, #0
-    mov TimePerSample, #1
+    mov TimePerSample, #2
 
     mov SamplesPerDisplay+0, #low(SAMPLES_PER_DISPLAY)
     mov SamplesPerDisplay+1, #high(SAMPLES_PER_DISPLAY)
@@ -890,10 +953,10 @@ main:
     setb kill_flag
 
     ; Default setpoints
-    mov temp_soak, #28
-    mov time_soak, #5
-    mov temp_refl, #30
-    mov time_refl, #5
+    mov temp_soak, #100
+    mov time_soak, #55
+    mov temp_refl, #210
+    mov time_refl, #40
 
     ; Which parameter we are currently adjusting: 1=temp_soak,2=time_soak,3=temp_refl,4=time_refl
     mov selected_state, #1
@@ -906,18 +969,20 @@ main:
     clr temp_state1
     clr temp_state3
     clr debug_bit
+    clr debug_bit1
     clr err_tmp
     clr err_tmp_150
+    setb display_flag
     mov seconds, #0
     mov state_sec, #0
     mov pwm_counter, #0
     mov pwm, #0
-    setb P3.0
     setb PB0_db
     setb PB1_db
     setb PB2_db
     setb PB3_db
     setb PB4_db
+    setb sound_flag
     ; Show initial LCD message
     ;Set_Cursor(1, 1)
     ;Send_Constant_String(#test_message)
@@ -1120,18 +1185,21 @@ DisplayValue:
 
     ; Convert FinalTemp => BCD => display
     lcall hex2bcd
-    ;lcall Display_formated_BCD
     lcall SendBCD
+    
+   ; jnb display_temp EndForever
+    lcall Display_formated_BCD
 
-    ; Reset accumulators
     mov StoreMeasurements+0, #0
     mov StoreMeasurements+1, #0
     mov StoreMeasurements+2, #0
     mov StoreMeasurements+3, #0
+
     mov StoreThermocouple+0, #0
     mov StoreThermocouple+1, #0
     mov StoreThermocouple+2, #0
     mov StoreThermocouple+3, #0
+
     mov FinalLM335+0, #0
     mov FinalLM335+1, #1
     mov FinalLM335+2, #2
@@ -1140,7 +1208,7 @@ DisplayValue:
 EndForever:
     ; Always read the push buttons each pass
     ;lcall LCD_PB
-
+    ; Reset accumulators
 
     mov x+0, #0
     mov x+1, #0
