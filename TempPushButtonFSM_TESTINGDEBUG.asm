@@ -42,6 +42,10 @@ TIMER0_RELOAD        EQU (0x10000-(CLK/TIMER0_DENOM))
 ORG 0x0000
     ljmp main
 
+; Timer/Counter 0 overflow interrupt vector
+org 0x000B
+	ljmp Timer0_ISR
+
 org 0x002B
     ljmp Timer2_ISR
 
