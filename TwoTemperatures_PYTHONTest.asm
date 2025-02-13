@@ -297,6 +297,15 @@ Forever:
 	mov y+3, #0
 	lcall div32
 
+	Load_y(1000000)
+    lcall mul32
+
+    Load_y(243)
+    lcall div32
+
+    Load_y(4100)
+    lcall div32
+
 
 	mov y+0, StoreThermocouple+0
 	mov y+1, StoreThermocouple+1
