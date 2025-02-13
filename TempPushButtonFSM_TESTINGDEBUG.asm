@@ -401,6 +401,7 @@ State_5:
     jnb temp_state5, jumpy
 	mov state, #0
     mov state_sec, #0
+    setb sound_flag
     sjmp State_end
 
 
@@ -431,6 +432,7 @@ State_end:
     mov kill_flag, c
     clr m_flag
     mov seconds, #0
+    clr sound_flag
     sjmp Display_0
 
 	; probably should put branch for warning message here
