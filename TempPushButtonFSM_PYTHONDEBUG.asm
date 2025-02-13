@@ -1,3 +1,4 @@
+
 ;----------------------------------------------------------------------
 ; 76E003 ADC test program (reflow oven controller + push buttons)
 ; Reads channel 7 on P1.1, pin 14
@@ -725,99 +726,6 @@ SendBCD:
 	add a, #'0' ; Convert value to ASCII
 	lcall SendSerial
 
-    mov a, #' '
-    lcall SendSerial
-
-    mov a, #0
-    mov c, temp_state1
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-    
-    mov a, #' '
-    lcall SendSerial
-    
-    mov a, state
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #' '
-    lcall SendSerial
-
-    mov a, #'d'
-    lcall SendSerial
-
-    mov a, #0
-    mov c, debug_bit
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #0
-    mov c, debug_bit1
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #' '
-    lcall SendSerial
-    
-    mov a, state_sec
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #' '
-    lcall SendSerial
-    
-    mov a, #'*'
-    lcall SendSerial
-    mov a, seconds
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #' '
-    lcall SendSerial
-
-    mov a, #0
-    mov c, m_flag
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #' '
-    lcall SendSerial
-    mov a, #' '
-    lcall SendSerial
-
-    mov a, #0
-    mov c, kill_flag
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-
-    mov a, #' '
-    lcall SendSerial
-
-    mov a, #0
-    mov c, start
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-    
-    mov a, #' '
-    lcall SendSerial
-    
-    mov a, #'p'
-    lcall SendSerial
-
-    mov a, #0
-    mov c, SSR_BOX
-    mov acc.0, c
-    add a, #'0'
-    lcall SendSerial
-
-
-
 	mov a, #'\n'
 	lcall SendSerial
 
@@ -1040,21 +948,11 @@ SkipCheck:
     mov  x+1, R1
     mov  x+2, #0
     mov  x+3, #0
-    Load_y(40959)
-    lcall mul32
+    Load_y(44000)
     mov  y+0, VAL_LM4040+0
     mov  y+1, VAL_LM4040+1
     mov  y+2, #0
     mov  y+3, #0
-    lcall div32
-
-	Load_y(1000000)
-    lcall mul32
-
-    Load_y(243)
-    lcall div32
-
-    Load_y(4100)
     lcall div32
 
     ; Add partial result to StoreThermocouple
@@ -1122,11 +1020,12 @@ DisplayValue:
     lcall div32
 
     ; Add thermocouple to LM335 reading => final in x
-    Load_y(0)
-    mov y+0, FinalLM335+0
-    mov y+1, FinalLM335+1
-    mov y+2, FinalLM335+2
-    mov y+3, FinalLM335+3
+    ;Load_y(0)
+    ;mov y+0, FinalLM335+0
+    ;mov y+1, FinalLM335+1
+    ;mov y+2, FinalLM335+2
+    ;mov y+3, FinalLM335+3
+    Load_y(2200)
     lcall add32
 
     mov FinalTemp+0, x+0
