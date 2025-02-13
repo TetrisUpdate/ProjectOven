@@ -114,12 +114,6 @@ Count1ms:      ds 2
 pwm_counter:   ds 1
 pwm:           ds 1
 
-debounce_count_0 :ds 1
-debounce_count_1 :ds 1
-debounce_count_2 :ds 1
-debounce_count_3 :ds 1
-debounce_count_4 :ds 1
-
 ; Oven settings
 temp_soak: ds 1  ; For state 1
 time_soak: ds 1  ; For state 2
@@ -157,14 +151,6 @@ PB1: dbit 1  ; Toggle selected parameter
 PB2: dbit 1  ; Increment
 PB3: dbit 1  ; Decrement
 PB4: dbit 1  ; Unused or extra
-
-PB0_db: dbit 1
-PB1_db: dbit 1
-PB2_db: dbit 1
-PB3_db: dbit 1
-PB4_db: dbit 1
-
-
 
 ;SETATS
 
@@ -208,54 +194,7 @@ Timer2_ISR:
     subb a, pwm_counter ; if pwm_counter <= pwm, c=1, so if pwm=20 for example, if 210ms has passed, c = 0, and the SSR box is always on
     cpl c
     mov SSR_BOX, c
-    
-CheckButton0:
-    jb PB0, CheckButton1 ;Skip to CheckPWM if a button is not pushed
-    inc debounce_count_0
-    mov a, debounce_count_0
-    cjne a, #15, CheckButton1
-	clr PB0_db
-    mov debounce_count_0, #0
-    clr a
 
-CheckButton1:
-    jb PB1, CheckButton2 ;Skip to CheckPWM if a button is not pushed
-    inc debounce_count_1
-    mov a, debounce_count_1
-    cjne a, #15, CheckButton2
-	clr PB1_db
-    mov debounce_count_1, #0
-    clr a
-
-CheckButton2:
-    jb PB2, CheckButton3 ;Skip to CheckPWM if a button is not pushed
-    inc debounce_count_2
-    mov a, debounce_count_2
-    cjne a, #15, CheckButton3
-	clr PB2_db
-    mov debounce_count_2, #0
-    clr a
-
-CheckButton3:
-    jb PB3, CheckButton4 ;Skip to CheckPWM if a button is not pushed
-    inc debounce_count_3
-    mov a, debounce_count_3
-    cjne a, #15, CheckButton4
-	clr PB3_db
-    mov debounce_count_3, #0
-    clr a
-
-CheckButton4:
-    jb PB4, CheckPWM ;Skip to CheckPWM if a button is not pushed
-    inc debounce_count_4
-    mov a, debounce_count_4
-    cjne a, #15, CheckPWM
-	clr PB4_db
-    mov debounce_count_4, #0
-    clr a
-
-
-CheckPWM:
     mov a, pwm_counter
     cjne a, #100, State_0 ; If 1 second has not passed, skip to State_0
     mov pwm_counter, #0 ; Reset pwm_counter
@@ -557,6 +496,10 @@ LCD_PB:
     ;---------------------------------
     ; Debouncing
     ;---------------------------------
+    jb  PB_INPUT_PIN, LCD_PB_Done 
+    mov R2, #10
+    lcall waitms
+    jb PB_INPUT_PIN, LCD_PB_Done
 
     ; Now set all MUX lines = 1 to read them individually
     setb MUX_CONTROL_0
@@ -595,10 +538,7 @@ LCD_PB:
     mov PB0, c
     setb MUX_CONTROL_0
 
-
 LCD_PB_Done:
-    setb LCD_RS
-    setb LCD_E
     ret
 
 ;----------------------------------------------------------------------
@@ -758,17 +698,27 @@ SendSerial:
 	ret
 
 button_logic:
-    jnb PB0_db, start_oven
-    jnb PB1_db, toggle_state
-    jnb PB2_db, inc_value
-    jnb PB3_db, dec_value
+    jnb PB0, start_oven
+    jnb PB1, toggle_state
+    jnb PB2, check_inc
+    jnb PB3, dec_value
     ; PB4 is unused for now, do nothing if pressed.
+	
+	ret
 
-    ret
+check_inc:
+	jnb inc_lock, do_inc
+	ljmp skip_inc
+
+do_inc:
+	setb inc_lock
+	lcall inc_value
+
+skip_inc:
+	ret
 
 ; Start the FSM
 start_oven:
-    setb PB0_db
 	clr c
     mov c, start
     clr a
@@ -789,7 +739,6 @@ start_oven:
 ; Toggle which parameter is selected (1..4)
 toggle_state:
     setb display_flag
-    setb PB1_db
     mov a, selected_state           ; load the selected state to the accumulator
     add a, #1                       ; icnrement the selection
     cjne a, #5, noWrap              ; if not greater than 4, jump to noWrap
@@ -802,7 +751,7 @@ noWrap:
 ; ** DOUBLE CHECK THIS LOGIC IM NOT TOO SURE **
 inc_value:
     setb display_flag
-    setb PB2_db
+    
     mov a, selected_state           ; load the selected state into the accumulator
     cjne a, #1, checkState2         ; if selected_state != temp_soak, check the next selected state
     inc temp_soak                   ; increment temp_soak if above condition not true
@@ -827,9 +776,6 @@ checkState4:
 ; ** SAME IDEA BUT CHECK THE LOGIC PLEASE ** 
 dec_value:
     setb display_flag
-    setb PB3_db
-    mov a, selected_state
-    
     cjne a, #1, dcheckState2
     djnz temp_soak, end_button_logic
     ljmp end_button_logic
@@ -900,22 +846,25 @@ main:
     mov pwm_counter, #0
     mov pwm, #0
     setb P3.0
-    setb PB0_db
-    setb PB1_db
-    setb PB2_db
-    setb PB3_db
-    setb PB4_db
     ; Show initial LCD message
     ;Set_Cursor(1, 1)
     ;Send_Constant_String(#test_message)
 
 Forever:
-    ; Always read the push buttons each pass
-	lcall LCD_PB
-	lcall button_logic
-	
 
-SkipCheck:
+    ; Always read the push buttons each pass
+    lcall LCD_PB
+    lcall button_logic
+
+	jb PB2, clear_inc
+	ljmp done_inc_check
+
+clear_inc:
+	clr inc_lock
+
+done_inc_check:
+
+
     ; Example read reference (AIN0)
     anl  ADCCON0, #0xF0
     orl  ADCCON0, #0x00 ; Channel0
