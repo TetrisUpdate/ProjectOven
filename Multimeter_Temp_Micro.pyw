@@ -157,7 +157,7 @@ CJTemp.set ("22")
 DMMout.set ("NO DATA")
 DMM_Name.set ("--------")
 
-port = 'COM3'
+??
 try:
    ser2 = serial.Serial(port, 115200, timeout=0)
 except:
