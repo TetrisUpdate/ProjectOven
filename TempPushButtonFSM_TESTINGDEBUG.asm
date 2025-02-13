@@ -176,6 +176,15 @@ $LIST
 ;----------------------------------------------------------------------
 ; Timer2 Initialization & ISR
 ;----------------------------------------------------------------------
+
+
+Timer0_Init:
+
+
+
+Timer0_ISR:
+
+
 Timer2_Init:
     mov T2CON, #0       ; Stop timer, mode = auto-reload
     mov TH2, #high(TIMER2_RELOAD)
