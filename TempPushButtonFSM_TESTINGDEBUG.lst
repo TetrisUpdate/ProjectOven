@@ -1201,200 +1201,218 @@
 0A83 753700    1047       mov  y+3, #0
 0A86 12033F    1048       lcall div32
 0A89           1049   
-0A89           1050       ; Add partial result to StoreThermocouple
-0A89 854F34    1051       mov  y+0, StoreThermocouple+0
-0A8C 855035    1052       mov  y+1, StoreThermocouple+1
-0A8F 855136    1053       mov  y+2, StoreThermocouple+2
-0A92 855237    1054       mov  y+3, StoreThermocouple+3
-0A95 1201FD    1055       lcall add32
-0A98 85304F    1056       mov  StoreThermocouple+0, x+0
-0A9B 853150    1057       mov  StoreThermocouple+1, x+1
-0A9E 853251    1058       mov  StoreThermocouple+2, x+2
-0AA1 853352    1059       mov  StoreThermocouple+3, x+3
-0AA4           1060   
-0AA4           1061       ; Delay between samples
-0AA4 AA4A      1062       mov R2, TimePerSample
-0AA6 120759    1063       lcall waitms
-0AA9           1064   
-0AA9           1065       ; Decrement measurement counter
-0AA9 1546      1066       dec MeasurementCounter+0
-0AAB E546      1067       mov a, MeasurementCounter+0
-0AAD B4FF02    1068       cjne a, #0xFF, CheckHigh
-0AB0 1547      1069       dec MeasurementCounter+1
-0AB2           1070   CheckHigh:
-0AB2 E546      1071       mov a, MeasurementCounter+0
-0AB4 4547      1072       orl a, MeasurementCounter+1
-0AB6 6003      1073       jz  DisplayValue
-0AB8 020C1F    1074       ljmp EndForever
-0ABB           1075   
-0ABB           1076   ;----------------------------------------------------------------------
-0ABB           1077   ; If enough measurements collected -> compute final temperature
-0ABB           1078   ;----------------------------------------------------------------------
-0ABB           1079   DisplayValue:
-0ABB 753400    1080            mov y+0, #low (0 % 0x10000) 
-0ABE 753500    1080            mov y+1, #high(0 % 0x10000) 
-0AC1 753600    1080            mov y+2, #low (0 / 0x10000) 
-0AC4 753700    1080            mov y+3, #high(0 / 0x10000) 
-0AC7           1081       ; Combine for LM335 reading
-0AC7 854030    1082       mov x+0, StoreMeasurements+0
-0ACA 854131    1083       mov x+1, StoreMeasurements+1
-0ACD 854232    1084       mov x+2, StoreMeasurements+2
-0AD0 854333    1085       mov x+3, StoreMeasurements+3
-0AD3 E548      1086       mov a, SamplesPerDisplay+0
-0AD5 F534      1087       mov y+0, a
-0AD7 F546      1088       mov MeasurementCounter+0, a
-0AD9 E549      1089       mov a, SamplesPerDisplay+1
-0ADB F535      1090       mov y+1, a
-0ADD F547      1091       mov MeasurementCounter+1, a
-0ADF 12033F    1092       lcall div32
-0AE2           1093   
-0AE2           1094       ; Subtract 273.00 => Celsius reading
-0AE2 7534A4    1095            mov y+0, #low (27300 % 0x10000) 
-0AE5 75356A    1095            mov y+1, #high(27300 % 0x10000) 
-0AE8 753600    1095            mov y+2, #low (27300 / 0x10000) 
-0AEB 753700    1095            mov y+3, #high(27300 / 0x10000) 
-0AEE 12021E    1096       lcall sub32
-0AF1 853057    1097       mov FinalLM335+0, x+0
-0AF4 853158    1098       mov FinalLM335+1, x+1
-0AF7 853259    1099       mov FinalLM335+2, x+2
-0AFA 85335A    1100       mov FinalLM335+3, x+3
-0AFD           1101   
-0AFD           1102       ; Combine for thermocouple reading
-0AFD 753400    1103            mov y+0, #low (0 % 0x10000) 
-0B00 753500    1103            mov y+1, #high(0 % 0x10000) 
-0B03 753600    1103            mov y+2, #low (0 / 0x10000) 
-0B06 753700    1103            mov y+3, #high(0 / 0x10000) 
-0B09 854F30    1104       mov x+0, StoreThermocouple+0
-0B0C 855031    1105       mov x+1, StoreThermocouple+1
-0B0F 855132    1106       mov x+2, StoreThermocouple+2
-0B12 855233    1107       mov x+3, StoreThermocouple+3
-0B15 E548      1108       mov a, SamplesPerDisplay+0
-0B17 F534      1109       mov y+0, a
-0B19 E549      1110       mov a, SamplesPerDisplay+1
-0B1B F535      1111       mov y+1, a
-0B1D 12033F    1112       lcall div32
-0B20           1113   
-0B20           1114       ; Add thermocouple to LM335 reading => final in x
-0B20 753400    1115            mov y+0, #low (0 % 0x10000) 
-0B23 753500    1115            mov y+1, #high(0 % 0x10000) 
-0B26 753600    1115            mov y+2, #low (0 / 0x10000) 
-0B29 753700    1115            mov y+3, #high(0 / 0x10000) 
-0B2C 855734    1116       mov y+0, FinalLM335+0
-0B2F 855835    1117       mov y+1, FinalLM335+1
-0B32 855936    1118       mov y+2, FinalLM335+2
-0B35 855A37    1119       mov y+3, FinalLM335+3
-0B38 1201FD    1120       lcall add32
-0B3B           1121   
-0B3B 85305B    1122       mov FinalTemp+0, x+0
-0B3E 85315C    1123       mov FinalTemp+1, x+1
-0B41 85325D    1124       mov FinalTemp+2, x+2
-0B44 85335E    1125       mov FinalTemp+3, x+3
-0B47           1126   
-0B47           1127       ; --------------------------------------------------------
-0B47           1128       ; Compare final temperature with soak/reflow setpoints
-0B47           1129       ; --------------------------------------------------------
-0B47 C200      1130       clr mf
-0B49 753464    1131            mov y+0, #low (100 % 0x10000) 
-0B4C 753500    1131            mov y+1, #high(100 % 0x10000) 
-0B4F 753600    1131            mov y+2, #low (100 / 0x10000) 
-0B52 753700    1131            mov y+3, #high(100 / 0x10000) 
-0B55 856D30    1132       mov x+0, temp_soak
-0B58 753100    1133       mov x+1, #0
-0B5B 753200    1134       mov x+2, #0
-0B5E 753300    1135       mov x+3, #0
-0B61 1202B2    1136       lcall mul32
-0B64 855B34    1137       mov y+0, FinalTemp+0
-0B67 855C35    1138       mov y+1, FinalTemp+1
-0B6A 855D36    1139       mov y+2, FinalTemp+2
-0B6D 855E37    1140       mov y+3, FinalTemp+3
-0B70 1202A8    1141       lcall x_lteq_y ; mf = 1 if temp_soak<=FinalTemp
-0B73 A200      1142       mov c, mf
-0B75 9208      1143       mov temp_state1, c
-0B77           1144   
-0B77 C200      1145       clr mf
-0B79 753464    1146            mov y+0, #low (100 % 0x10000) 
-0B7C 753500    1146            mov y+1, #high(100 % 0x10000) 
-0B7F 753600    1146            mov y+2, #low (100 / 0x10000) 
-0B82 753700    1146            mov y+3, #high(100 / 0x10000) 
-0B85 856F30    1147       mov x+0, temp_refl
-0B88 753100    1148       mov x+1, #0
-0B8B 753200    1149       mov x+2, #0
-0B8E 753300    1150       mov x+3, #0
-0B91 1202B2    1151       lcall mul32
-0B94 855B34    1152       mov y+0, FinalTemp+0
-0B97 855C35    1153       mov y+1, FinalTemp+1
-0B9A 855D36    1154       mov y+2, FinalTemp+2
-0B9D 855E37    1155       mov y+3, FinalTemp+3
-0BA0 1202A8    1156       lcall x_lteq_y ; mf = 1 if temp_refl<=FinalTemp
-0BA3 A200      1157       mov c, mf
-0BA5 9209      1158       mov temp_state3, c
-0BA7           1159   
-0BA7           1160       ; Check error states
-0BA7 855B30    1161       mov x+0, FinalTemp+0
-0BAA 855C31    1162       mov x+1, FinalTemp+1
-0BAD 855D32    1163       mov x+2, FinalTemp+2
-0BB0 855E33    1164       mov x+3, FinalTemp+3
-0BB3           1165   
-0BB3 C200      1166       clr mf
-0BB5 7534A8    1167            mov y+0, #low (25000 % 0x10000) 
-0BB8 753561    1167            mov y+1, #high(25000 % 0x10000) 
-0BBB 753600    1167            mov y+2, #low (25000 / 0x10000) 
-0BBE 753700    1167            mov y+3, #high(25000 / 0x10000) 
-0BC1 12029E    1168       lcall x_gteq_y ; mf = 1 if FinalTemp<=250
-0BC4 A200      1169       mov c, mf
-0BC6 9204      1170       mov err_tmp_150, c
-0BC8           1171   
-0BC8 C200      1172       clr mf
-0BCA 753488    1173            mov y+0, #low (5000 % 0x10000) 
-0BCD 753513    1173            mov y+1, #high(5000 % 0x10000) 
-0BD0 753600    1173            mov y+2, #low (5000 / 0x10000) 
-0BD3 753700    1173            mov y+3, #high(5000 / 0x10000) 
-0BD6 12029E    1174       lcall x_gteq_y ; mf = 1 if FinalTemp>=50
-0BD9 A200      1175       mov c, mf
-0BDB 9203      1176       mov err_tmp, c
-0BDD           1177   
-0BDD C200      1178       clr mf
-0BDF 7534B8    1179            mov y+0, #low (3000 % 0x10000) 
-0BE2 75350B    1179            mov y+1, #high(3000 % 0x10000) 
-0BE5 753600    1179            mov y+2, #low (3000 / 0x10000) 
-0BE8 753700    1179            mov y+3, #high(3000 / 0x10000) 
-0BEB 1202A8    1180       lcall x_lteq_y ; mf = 1 if FinalTemp<=60
-0BEE A200      1181       mov c, mf
-0BF0 920A      1182       mov temp_state5, c
-0BF2           1183   
-0BF2           1184   
-0BF2           1185   
-0BF2           1186       ; Convert FinalTemp => BCD => display
-0BF2 120138    1187       lcall hex2bcd
-0BF5 12081B    1188       lcall SendBCD
-0BF8           1189       
-0BF8           1190      ; jnb display_temp EndForever
-0BF8 1207AC    1191       lcall Display_formated_BCD
-0BFB           1192   
-0BFB 754000    1193       mov StoreMeasurements+0, #0
-0BFE 754100    1194       mov StoreMeasurements+1, #0
-0C01 754200    1195       mov StoreMeasurements+2, #0
-0C04 754300    1196       mov StoreMeasurements+3, #0
-0C07           1197   
-0C07 754F00    1198       mov StoreThermocouple+0, #0
-0C0A 755000    1199       mov StoreThermocouple+1, #0
-0C0D 755100    1200       mov StoreThermocouple+2, #0
-0C10 755200    1201       mov StoreThermocouple+3, #0
-0C13           1202   
-0C13 755700    1203       mov FinalLM335+0, #0
-0C16 755801    1204       mov FinalLM335+1, #1
-0C19 755902    1205       mov FinalLM335+2, #2
-0C1C 755A03    1206       mov FinalLM335+3, #3
-0C1F           1207   
-0C1F           1208   EndForever:
-0C1F           1209       ; Always read the push buttons each pass
-0C1F           1210       ;lcall LCD_PB
-0C1F           1211       ; Reset accumulators
-0C1F           1212   
-0C1F 753000    1213       mov x+0, #0
-0C22 753100    1214       mov x+1, #0
-0C25 753200    1215       mov x+2, #0
-0C28 753300    1216       mov x+3, #0
-0C2B 0209F9    1217       ljmp Forever
-0C2E           1218   
-0C2E           1219   END
+0A89 7534E8    1050            mov y+0, #low (1000 % 0x10000) 
+0A8C 753503    1050            mov y+1, #high(1000 % 0x10000) 
+0A8F 753600    1050            mov y+2, #low (1000 / 0x10000) 
+0A92 753700    1050            mov y+3, #high(1000 / 0x10000) 
+0A95 1202B2    1051       lcall mul32
+0A98           1052   
+0A98 7534FA    1053            mov y+0, #low (250 % 0x10000) 
+0A9B 753500    1053            mov y+1, #high(250 % 0x10000) 
+0A9E 753600    1053            mov y+2, #low (250 / 0x10000) 
+0AA1 753700    1053            mov y+3, #high(250 / 0x10000) 
+0AA4 12033F    1054       lcall div32
+0AA7           1055   
+0AA7 753429    1056            mov y+0, #low (41 % 0x10000) 
+0AAA 753500    1056            mov y+1, #high(41 % 0x10000) 
+0AAD 753600    1056            mov y+2, #low (41 / 0x10000) 
+0AB0 753700    1056            mov y+3, #high(41 / 0x10000) 
+0AB3 12033F    1057       lcall div32
+0AB6           1058   
+0AB6           1059       ; Add partial result to StoreThermocouple
+0AB6 854F34    1060       mov  y+0, StoreThermocouple+0
+0AB9 855035    1061       mov  y+1, StoreThermocouple+1
+0ABC 855136    1062       mov  y+2, StoreThermocouple+2
+0ABF 855237    1063       mov  y+3, StoreThermocouple+3
+0AC2 1201FD    1064       lcall add32
+0AC5 85304F    1065       mov  StoreThermocouple+0, x+0
+0AC8 853150    1066       mov  StoreThermocouple+1, x+1
+0ACB 853251    1067       mov  StoreThermocouple+2, x+2
+0ACE 853352    1068       mov  StoreThermocouple+3, x+3
+0AD1           1069   
+0AD1           1070       ; Delay between samples
+0AD1 AA4A      1071       mov R2, TimePerSample
+0AD3 120759    1072       lcall waitms
+0AD6           1073   
+0AD6           1074       ; Decrement measurement counter
+0AD6 1546      1075       dec MeasurementCounter+0
+0AD8 E546      1076       mov a, MeasurementCounter+0
+0ADA B4FF02    1077       cjne a, #0xFF, CheckHigh
+0ADD 1547      1078       dec MeasurementCounter+1
+0ADF           1079   CheckHigh:
+0ADF E546      1080       mov a, MeasurementCounter+0
+0AE1 4547      1081       orl a, MeasurementCounter+1
+0AE3 6003      1082       jz  DisplayValue
+0AE5 020C4C    1083       ljmp EndForever
+0AE8           1084   
+0AE8           1085   ;----------------------------------------------------------------------
+0AE8           1086   ; If enough measurements collected -> compute final temperature
+0AE8           1087   ;----------------------------------------------------------------------
+0AE8           1088   DisplayValue:
+0AE8 753400    1089            mov y+0, #low (0 % 0x10000) 
+0AEB 753500    1089            mov y+1, #high(0 % 0x10000) 
+0AEE 753600    1089            mov y+2, #low (0 / 0x10000) 
+0AF1 753700    1089            mov y+3, #high(0 / 0x10000) 
+0AF4           1090       ; Combine for LM335 reading
+0AF4 854030    1091       mov x+0, StoreMeasurements+0
+0AF7 854131    1092       mov x+1, StoreMeasurements+1
+0AFA 854232    1093       mov x+2, StoreMeasurements+2
+0AFD 854333    1094       mov x+3, StoreMeasurements+3
+0B00 E548      1095       mov a, SamplesPerDisplay+0
+0B02 F534      1096       mov y+0, a
+0B04 F546      1097       mov MeasurementCounter+0, a
+0B06 E549      1098       mov a, SamplesPerDisplay+1
+0B08 F535      1099       mov y+1, a
+0B0A F547      1100       mov MeasurementCounter+1, a
+0B0C 12033F    1101       lcall div32
+0B0F           1102   
+0B0F           1103       ; Subtract 273.00 => Celsius reading
+0B0F 7534A4    1104            mov y+0, #low (27300 % 0x10000) 
+0B12 75356A    1104            mov y+1, #high(27300 % 0x10000) 
+0B15 753600    1104            mov y+2, #low (27300 / 0x10000) 
+0B18 753700    1104            mov y+3, #high(27300 / 0x10000) 
+0B1B 12021E    1105       lcall sub32
+0B1E 853057    1106       mov FinalLM335+0, x+0
+0B21 853158    1107       mov FinalLM335+1, x+1
+0B24 853259    1108       mov FinalLM335+2, x+2
+0B27 85335A    1109       mov FinalLM335+3, x+3
+0B2A           1110   
+0B2A           1111       ; Combine for thermocouple reading
+0B2A 753400    1112            mov y+0, #low (0 % 0x10000) 
+0B2D 753500    1112            mov y+1, #high(0 % 0x10000) 
+0B30 753600    1112            mov y+2, #low (0 / 0x10000) 
+0B33 753700    1112            mov y+3, #high(0 / 0x10000) 
+0B36 854F30    1113       mov x+0, StoreThermocouple+0
+0B39 855031    1114       mov x+1, StoreThermocouple+1
+0B3C 855132    1115       mov x+2, StoreThermocouple+2
+0B3F 855233    1116       mov x+3, StoreThermocouple+3
+0B42 E548      1117       mov a, SamplesPerDisplay+0
+0B44 F534      1118       mov y+0, a
+0B46 E549      1119       mov a, SamplesPerDisplay+1
+0B48 F535      1120       mov y+1, a
+0B4A 12033F    1121       lcall div32
+0B4D           1122   
+0B4D           1123       ; Add thermocouple to LM335 reading => final in x
+0B4D 753400    1124            mov y+0, #low (0 % 0x10000) 
+0B50 753500    1124            mov y+1, #high(0 % 0x10000) 
+0B53 753600    1124            mov y+2, #low (0 / 0x10000) 
+0B56 753700    1124            mov y+3, #high(0 / 0x10000) 
+0B59 855734    1125       mov y+0, FinalLM335+0
+0B5C 855835    1126       mov y+1, FinalLM335+1
+0B5F 855936    1127       mov y+2, FinalLM335+2
+0B62 855A37    1128       mov y+3, FinalLM335+3
+0B65 1201FD    1129       lcall add32
+0B68           1130   
+0B68 85305B    1131       mov FinalTemp+0, x+0
+0B6B 85315C    1132       mov FinalTemp+1, x+1
+0B6E 85325D    1133       mov FinalTemp+2, x+2
+0B71 85335E    1134       mov FinalTemp+3, x+3
+0B74           1135   
+0B74           1136       ; --------------------------------------------------------
+0B74           1137       ; Compare final temperature with soak/reflow setpoints
+0B74           1138       ; --------------------------------------------------------
+0B74 C200      1139       clr mf
+0B76 753464    1140            mov y+0, #low (100 % 0x10000) 
+0B79 753500    1140            mov y+1, #high(100 % 0x10000) 
+0B7C 753600    1140            mov y+2, #low (100 / 0x10000) 
+0B7F 753700    1140            mov y+3, #high(100 / 0x10000) 
+0B82 856D30    1141       mov x+0, temp_soak
+0B85 753100    1142       mov x+1, #0
+0B88 753200    1143       mov x+2, #0
+0B8B 753300    1144       mov x+3, #0
+0B8E 1202B2    1145       lcall mul32
+0B91 855B34    1146       mov y+0, FinalTemp+0
+0B94 855C35    1147       mov y+1, FinalTemp+1
+0B97 855D36    1148       mov y+2, FinalTemp+2
+0B9A 855E37    1149       mov y+3, FinalTemp+3
+0B9D 1202A8    1150       lcall x_lteq_y ; mf = 1 if temp_soak<=FinalTemp
+0BA0 A200      1151       mov c, mf
+0BA2 9208      1152       mov temp_state1, c
+0BA4           1153   
+0BA4 C200      1154       clr mf
+0BA6 753464    1155            mov y+0, #low (100 % 0x10000) 
+0BA9 753500    1155            mov y+1, #high(100 % 0x10000) 
+0BAC 753600    1155            mov y+2, #low (100 / 0x10000) 
+0BAF 753700    1155            mov y+3, #high(100 / 0x10000) 
+0BB2 856F30    1156       mov x+0, temp_refl
+0BB5 753100    1157       mov x+1, #0
+0BB8 753200    1158       mov x+2, #0
+0BBB 753300    1159       mov x+3, #0
+0BBE 1202B2    1160       lcall mul32
+0BC1 855B34    1161       mov y+0, FinalTemp+0
+0BC4 855C35    1162       mov y+1, FinalTemp+1
+0BC7 855D36    1163       mov y+2, FinalTemp+2
+0BCA 855E37    1164       mov y+3, FinalTemp+3
+0BCD 1202A8    1165       lcall x_lteq_y ; mf = 1 if temp_refl<=FinalTemp
+0BD0 A200      1166       mov c, mf
+0BD2 9209      1167       mov temp_state3, c
+0BD4           1168   
+0BD4           1169       ; Check error states
+0BD4 855B30    1170       mov x+0, FinalTemp+0
+0BD7 855C31    1171       mov x+1, FinalTemp+1
+0BDA 855D32    1172       mov x+2, FinalTemp+2
+0BDD 855E33    1173       mov x+3, FinalTemp+3
+0BE0           1174   
+0BE0 C200      1175       clr mf
+0BE2 7534A8    1176            mov y+0, #low (25000 % 0x10000) 
+0BE5 753561    1176            mov y+1, #high(25000 % 0x10000) 
+0BE8 753600    1176            mov y+2, #low (25000 / 0x10000) 
+0BEB 753700    1176            mov y+3, #high(25000 / 0x10000) 
+0BEE 12029E    1177       lcall x_gteq_y ; mf = 1 if FinalTemp<=250
+0BF1 A200      1178       mov c, mf
+0BF3 9204      1179       mov err_tmp_150, c
+0BF5           1180   
+0BF5 C200      1181       clr mf
+0BF7 753488    1182            mov y+0, #low (5000 % 0x10000) 
+0BFA 753513    1182            mov y+1, #high(5000 % 0x10000) 
+0BFD 753600    1182            mov y+2, #low (5000 / 0x10000) 
+0C00 753700    1182            mov y+3, #high(5000 / 0x10000) 
+0C03 12029E    1183       lcall x_gteq_y ; mf = 1 if FinalTemp>=50
+0C06 A200      1184       mov c, mf
+0C08 9203      1185       mov err_tmp, c
+0C0A           1186   
+0C0A C200      1187       clr mf
+0C0C 7534B8    1188            mov y+0, #low (3000 % 0x10000) 
+0C0F 75350B    1188            mov y+1, #high(3000 % 0x10000) 
+0C12 753600    1188            mov y+2, #low (3000 / 0x10000) 
+0C15 753700    1188            mov y+3, #high(3000 / 0x10000) 
+0C18 1202A8    1189       lcall x_lteq_y ; mf = 1 if FinalTemp<=60
+0C1B A200      1190       mov c, mf
+0C1D 920A      1191       mov temp_state5, c
+0C1F           1192   
+0C1F           1193   
+0C1F           1194   
+0C1F           1195       ; Convert FinalTemp => BCD => display
+0C1F 120138    1196       lcall hex2bcd
+0C22 12081B    1197       lcall SendBCD
+0C25           1198       
+0C25           1199      ; jnb display_temp EndForever
+0C25 1207AC    1200       lcall Display_formated_BCD
+0C28           1201   
+0C28 754000    1202       mov StoreMeasurements+0, #0
+0C2B 754100    1203       mov StoreMeasurements+1, #0
+0C2E 754200    1204       mov StoreMeasurements+2, #0
+0C31 754300    1205       mov StoreMeasurements+3, #0
+0C34           1206   
+0C34 754F00    1207       mov StoreThermocouple+0, #0
+0C37 755000    1208       mov StoreThermocouple+1, #0
+0C3A 755100    1209       mov StoreThermocouple+2, #0
+0C3D 755200    1210       mov StoreThermocouple+3, #0
+0C40           1211   
+0C40 755700    1212       mov FinalLM335+0, #0
+0C43 755801    1213       mov FinalLM335+1, #1
+0C46 755902    1214       mov FinalLM335+2, #2
+0C49 755A03    1215       mov FinalLM335+3, #3
+0C4C           1216   
+0C4C           1217   EndForever:
+0C4C           1218       ; Always read the push buttons each pass
+0C4C           1219       ;lcall LCD_PB
+0C4C           1220       ; Reset accumulators
+0C4C           1221   
+0C4C 753000    1222       mov x+0, #0
+0C4F 753100    1223       mov x+1, #0
+0C52 753200    1224       mov x+2, #0
+0C55 753300    1225       mov x+3, #0
+0C58 0209F9    1226       ljmp Forever
+0C5B           1227   
+0C5B           1228   END

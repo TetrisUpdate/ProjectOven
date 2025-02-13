@@ -1047,6 +1047,15 @@ SkipCheck:
     mov  y+3, #0
     lcall div32
 
+    Load_y(1000)
+    lcall mul32
+
+    Load_y(250)
+    lcall div32
+
+    Load_y(41)
+    lcall div32
+
     ; Add partial result to StoreThermocouple
     mov  y+0, StoreThermocouple+0
     mov  y+1, StoreThermocouple+1
