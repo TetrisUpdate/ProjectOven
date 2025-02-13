@@ -23,8 +23,8 @@
 0000             25   TIMER1_RELOAD     EQU (0x100-(CLK/(16*BAUD)))
 0000             26   TIMER0_RELOAD EQU (0x10000-(CLK/TIMER0_DENOM))
 0000             27   
-0000             28   SAMPLES_PER_DISPLAY equ 300 
-0000             29   REFRESHES_PER_SECOND equ 45 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
+0000             28   SAMPLES_PER_DISPLAY equ 150
+0000             29   REFRESHES_PER_SECOND equ 15 ;Does not work properly for high number of samples/display, actual refreshes/sec is less than value given if samples/display is higher than around 255
 0000             30   TIMER0_DENOM equ (SAMPLES_PER_DISPLAY*REFRESHES_PER_SECOND)
 0000             31   
 0000             32   ORG 0x0000
@@ -113,8 +113,8 @@
 0387            114   wait_1ms:
 0387 C28C       115            clr     TR0 ; Stop timer 0
 0389 C28D       116            clr     TF0 ; Clear overflow flag
-038B 758CFB     117            mov     TH0, #high(TIMER0_RELOAD)
-038E 758A33     118            mov     TL0,#low(TIMER0_RELOAD)
+038B 758CE3     117            mov     TH0, #high(TIMER0_RELOAD)
+038E 758A2F     118            mov     TL0,#low(TIMER0_RELOAD)
 0391 D28C       119            setb TR0
 0393 308DFD     120            jnb     TF0, $ ; Wait for overflow
 0396 22         121            ret
@@ -198,8 +198,8 @@
 041B            170   
 041B 754901     171            mov TimePerSample, #1
 041E            172   
-041E 75472C     173            mov SamplesPerDisplay+0, #low(SAMPLES_PER_DISPLAY)
-0421 754801     174            mov SamplesPerDisplay+1, #high(SAMPLES_PER_DISPLAY)
+041E 754796     173            mov SamplesPerDisplay+0, #low(SAMPLES_PER_DISPLAY)
+0421 754800     174            mov SamplesPerDisplay+1, #high(SAMPLES_PER_DISPLAY)
 0424            175            
 0424 754A00     176            mov LastMeasurement+0, #0
 0427 754B00     177            mov LastMeasurement+1, #0
