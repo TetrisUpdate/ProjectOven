@@ -1,4 +1,3 @@
-
 ;----------------------------------------------------------------------
 ; 76E003 ADC test program (reflow oven controller + push buttons)
 ; Reads channel 7 on P1.1, pin 14
@@ -393,6 +392,7 @@ State_4:
     mov state_sec, #0
 
 State_5:
+	setb sound_flag
     jb kill_flag, State_error
 	mov a, state
 	cjne a, #5, jumpy
@@ -667,6 +667,8 @@ Display_formated_BCD:
     Display_char(#'C')
     Set_Cursor(2,8)
     Display_char(#' ')
+    Set_Cursor(1,15)
+    Display_BCD(state)
     ret
 
 ;----------------------------------------------------------------------
@@ -891,7 +893,7 @@ main:
     setb PB2_db
     setb PB3_db
     setb PB4_db
-    setb sound_flag
+    clr sound_flag
     ; Show initial LCD message
     ;Set_Cursor(1, 1)
     ;Send_Constant_String(#test_message)
@@ -948,12 +950,25 @@ SkipCheck:
     mov  x+1, R1
     mov  x+2, #0
     mov  x+3, #0
-    Load_y(44000)
+    Load_y(40959)
+    lcall mul32
     mov  y+0, VAL_LM4040+0
     mov  y+1, VAL_LM4040+1
     mov  y+2, #0
     mov  y+3, #0
     lcall div32
+
+    Load_y(10000)
+    lcall mul32
+
+	Load_y(9700)
+    lcall div32
+    
+    Load_y(200)
+    lcall add32
+    
+	
+
 
     ; Add partial result to StoreThermocouple
     mov  y+0, StoreThermocouple+0
@@ -1020,19 +1035,43 @@ DisplayValue:
     lcall div32
 
     ; Add thermocouple to LM335 reading => final in x
-    ;Load_y(0)
-    ;mov y+0, FinalLM335+0
-    ;mov y+1, FinalLM335+1
-    ;mov y+2, FinalLM335+2
-    ;mov y+3, FinalLM335+3
-    Load_y(2200)
+    Load_y(0)
+    mov y+0, FinalLM335+0
+    mov y+1, FinalLM335+1
+    mov y+2, FinalLM335+2
+    mov y+3, FinalLM335+3
     lcall add32
+    
+    clr mf
+	Load_y(17100)
+	lcall x_gteq_y
+	jnb mf, SkipSub
+	Load_y(300)
+	lcall sub32
+SkipSub:
 
-    mov FinalTemp+0, x+0
+	clr mf
+	Load_y(17500)
+	lcall x_gteq_y
+	jnb mf, SkipSub2
+	Load_y(300)
+	lcall sub32
+	
+SkipSub2:
+
+	clr mf
+	Load_y(18200)
+	lcall x_gteq_y
+	jnb mf, SkipSub3
+	Load_y(450)
+	lcall sub32
+	
+SkipSub3:
+
+	mov FinalTemp+0, x+0
     mov FinalTemp+1, x+1
     mov FinalTemp+2, x+2
     mov FinalTemp+3, x+3
-
     ; --------------------------------------------------------
     ; Compare final temperature with soak/reflow setpoints
     ; --------------------------------------------------------
@@ -1090,7 +1129,7 @@ DisplayValue:
     mov c, mf
     mov temp_state5, c
 
-
+	
 
     ; Convert FinalTemp => BCD => display
     lcall hex2bcd

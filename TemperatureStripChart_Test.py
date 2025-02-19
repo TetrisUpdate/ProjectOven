@@ -6,12 +6,12 @@ import serial
 import matplotlib.cm as cm
 
 xsize=60
-ysize = 60
+ysize = 300
 maxtemp = float('-inf')
 mintemp = float('inf')
 
 cmap = cm.plasma # Choose colour map "Plasma"
-norm = plt.Normalize(vmin=20, vmax = 60) # Range for colour map is from 20 to 60 degrees C
+norm = plt.Normalize(vmin=20, vmax = 200) # Range for colour map is from 20 to 60 degrees C
 
 ser = serial.Serial(
  port='COM3',

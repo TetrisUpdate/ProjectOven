@@ -392,6 +392,7 @@ State_4:
     mov state_sec, #0
 
 State_5:
+	setb sound_flag
     jb kill_flag, State_error
 	mov a, state
 	cjne a, #5, jumpy
@@ -401,7 +402,6 @@ State_5:
     jnb temp_state5, jumpy
 	mov state, #0
     mov state_sec, #0
-    setb sound_flag
     sjmp State_end
 
 
@@ -432,7 +432,6 @@ State_end:
     mov kill_flag, c
     clr m_flag
     mov seconds, #0
-    clr sound_flag
     sjmp Display_0
 
 	; probably should put branch for warning message here
@@ -959,11 +958,17 @@ SkipCheck:
     mov  y+3, #0
     lcall div32
 
-	Load_y(9635)
+    Load_y(10000)
     lcall mul32
 
-    Load_y(10000)
+	Load_y(9700)
     lcall div32
+    
+    Load_y(200)
+    lcall add32
+    
+	
+
 
     ; Add partial result to StoreThermocouple
     mov  y+0, StoreThermocouple+0
@@ -1036,12 +1041,37 @@ DisplayValue:
     mov y+2, FinalLM335+2
     mov y+3, FinalLM335+3
     lcall add32
+    
+    clr mf
+	Load_y(17100)
+	lcall x_gteq_y
+	jnb mf, SkipSub
+	Load_y(300)
+	lcall sub32
+SkipSub:
 
-    mov FinalTemp+0, x+0
+	clr mf
+	Load_y(17500)
+	lcall x_gteq_y
+	jnb mf, SkipSub2
+	Load_y(300)
+	lcall sub32
+	
+SkipSub2:
+
+	clr mf
+	Load_y(18200)
+	lcall x_gteq_y
+	jnb mf, SkipSub3
+	Load_y(450)
+	lcall sub32
+	
+SkipSub3:
+
+	mov FinalTemp+0, x+0
     mov FinalTemp+1, x+1
     mov FinalTemp+2, x+2
     mov FinalTemp+3, x+3
-
     ; --------------------------------------------------------
     ; Compare final temperature with soak/reflow setpoints
     ; --------------------------------------------------------
@@ -1099,7 +1129,7 @@ DisplayValue:
     mov c, mf
     mov temp_state5, c
 
-
+	
 
     ; Convert FinalTemp => BCD => display
     lcall hex2bcd
